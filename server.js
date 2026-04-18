@@ -1,0 +1,1361 @@
+'use strict';
+
+require('dotenv').config();
+
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const Database = require('better-sqlite3');
+const https = require('https');
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'bletaria-secret-2025';
+const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'admin-bletaria-2025';
+const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '';
+const DATA_DIR = '/opt/bletaria/data';
+const UPLOADS_DIR = '/opt/bletaria/uploads';
+const DB_PATH = path.join(DATA_DIR, 'bletaria.db');
+const AI_MONTHLY_LIMIT = 10;
+
+// ─── Directory Setup ──────────────────────────────────────────────────────────
+
+[DATA_DIR, UPLOADS_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// ─── Database Init ────────────────────────────────────────────────────────────
+
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'user',
+    avatar TEXT,
+    reset_token TEXT,
+    reset_token_expires INTEGER,
+    active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS apiaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    rows INTEGER NOT NULL DEFAULT 1,
+    hives_per_row INTEGER NOT NULL DEFAULT 5,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS hives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    apiary_id INTEGER NOT NULL,
+    position_row INTEGER NOT NULL,
+    position_col INTEGER NOT NULL,
+    unique_code TEXT UNIQUE NOT NULL,
+    status TEXT DEFAULT 'good',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (apiary_id) REFERENCES apiaries(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS hive_floors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hive_id INTEGER NOT NULL,
+    floor_number INTEGER NOT NULL,
+    frames_bees INTEGER DEFAULT 0,
+    frames_eggs INTEGER DEFAULT 0,
+    frames_honey INTEGER DEFAULT 0,
+    frames_new INTEGER DEFAULT 0,
+    FOREIGN KEY (hive_id) REFERENCES hives(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS visits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    apiary_id INTEGER NOT NULL,
+    visit_date TEXT NOT NULL,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (apiary_id) REFERENCES apiaries(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS hive_visit_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visit_id INTEGER NOT NULL,
+    hive_id INTEGER NOT NULL,
+    queen_present INTEGER DEFAULT 1,
+    queen_age_months INTEGER,
+    status TEXT DEFAULT 'good',
+    notes TEXT,
+    FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE CASCADE,
+    FOREIGN KEY (hive_id) REFERENCES hives(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS hive_floor_visit_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hive_visit_data_id INTEGER NOT NULL,
+    floor_id INTEGER NOT NULL,
+    frames_bees INTEGER,
+    frames_eggs INTEGER,
+    frames_honey INTEGER,
+    frames_new INTEGER,
+    FOREIGN KEY (hive_visit_data_id) REFERENCES hive_visit_data(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS feeding_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    apiary_id INTEGER NOT NULL,
+    plan_date TEXT NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (apiary_id) REFERENCES apiaries(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS feeding_plan_hives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    feeding_plan_id INTEGER NOT NULL,
+    hive_id INTEGER NOT NULL,
+    food_amount TEXT,
+    medicine TEXT,
+    notes TEXT,
+    FOREIGN KEY (feeding_plan_id) REFERENCES feeding_plans(id) ON DELETE CASCADE,
+    FOREIGN KEY (hive_id) REFERENCES hives(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS community_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    image_url TEXT,
+    likes INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS post_likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    UNIQUE(post_id, user_id),
+    FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS marketplace_listings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    price REAL,
+    category TEXT,
+    image_url TEXT,
+    contact TEXT,
+    expires_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    image_url TEXT,
+    admin_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS admin_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS ai_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    month_year TEXT NOT NULL,
+    count INTEGER DEFAULT 0,
+    UNIQUE(user_id, month_year),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+`);
+
+// ─── Seed Data ────────────────────────────────────────────────────────────────
+
+// Default admin
+const existingAdmin = db.prepare('SELECT id FROM admin_users WHERE username = ?').get('admin');
+if (!existingAdmin) {
+  const hash = bcrypt.hashSync('admin123', 10);
+  db.prepare('INSERT INTO admin_users (username, password_hash) VALUES (?, ?)').run('admin', hash);
+  console.log('Default admin created: admin / admin123');
+}
+
+// Default settings
+const listingExpiry = db.prepare("SELECT value FROM app_settings WHERE key = 'listing_expiry_days'").get();
+if (!listingExpiry) {
+  db.prepare("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('listing_expiry_days', '30')").run();
+}
+
+// Sample news
+const newsCount = db.prepare('SELECT COUNT(*) as c FROM news').get();
+if (newsCount.c === 0) {
+  const sampleNews = [
+    {
+      title: 'Sezoni i Bletarisë 2025: Çfarë duhet të dini',
+      content: `Sezoni i ri i bletarisë ka filluar dhe bletarët në të gjithë vendin po përgatiten për muajt e ngjeshur të punës. Ekspertët rekomandojnë që çdo bletari të kryejë inspektimin e plotë të kosherëve gjatë muajit prill, para lulëzimit të florës kryesore.
+
+Vëmendje e veçantë duhet t'i kushtohet kontrollit të mbretëreshës, nivelit të ushqimit dhe gjendjes sanitare të kosherëve. Bletarët me përvojë sugjerojnë të kryhen së paku dy vizita në javë gjatë majit dhe qershorit.
+
+Vitin e kaluar, prodhimi mesatar i mjaltit në Kosovë arriti në 18-22 kg për koshëre, ndërsa projeksionet për 2025 janë optimiste falë kushteve të favorshme atmosferike. Ministria e Bujqësisë ka njoftuar programe mbështetëse për bletarët e rinj, duke përfshirë subvencione për pajisje dhe trajnime profesionale.`,
+      image_url: null
+    },
+    {
+      title: 'Sëmundja Varroa: Si ta luftojmë efektivisht',
+      content: `Varroa destructor mbetet kërcënimi kryesor për bletaritë në të gjithë botën. Ky parazit i jashtëm sulmoi kolonitë e bleive dhe mund të shkaktojë humbje të mëdha nëse nuk trajtohet me kohë.
+
+Metodat e luftimit ndahen në: kimike (acide organike si acidi oksalik, tirmolik dhe format), biologjike (heqja e mjaltit të dronëve) dhe mekanike (pauzat e rritjes së pjellës).
+
+Trajtimi me acid oksalik gjatë dimrit, kur kolonitë janë pa pjellë, është metoda më efektive dhe e sigurt. Është e rëndësishme të monitorohet numri i acarëve çdo muaj duke përdorur metodën e rrëshqitjes alkoolike - mbi 3 acarë për 100 blete tregon nevojën urgjente për trajtim.
+
+Rotacioni i barnave kimike ndihmon në parandalimin e rezistencës. Konsultohuni gjithmonë me veterinerin e komunës tuaj para çdo trajtimi.`,
+      image_url: null
+    },
+    {
+      title: 'Teknikat moderne të nxjerrjes dhe ruajtjes së mjaltit',
+      content: `Mjalti i cilësisë së lartë kërkon kujdes të veçantë si gjatë nxjerrjes ashtu edhe gjatë ruajtjes. Gabime të vogla mund të ndikojnë ndjeshëm në cilësinë dhe shijen e produktit final.
+
+Nxjerrja duhet të bëhet vetëm kur mjalti është i pjekur - kornizat duhet të jenë të paktën 80% të mbyllura me kapak dylli. Mjalti i papjekur ka lagështi të lartë dhe fermenton lehtë. Temperatura ideale e dhomës gjatë nxjerrjes është 25-30°C.
+
+Centrifugat moderne me dy shpejtësi lejojnë nxjerrje pa dëmtuar kornizat. Pas nxjerrjes, mjalti duhet filtruar dy herë dhe lënë të qetësohet 24-48 orë për të hequr flluskat e ajrit.
+
+Enët prej qelqi janë ideale për ruajtje - shmangni plastikën. Temperatura e ruajtjes duhet të jetë 10-18°C, larg dritës direkte. Mjalti i ruajtur siç duhet ruan cilësinë e tij për 2-3 vjet.`,
+      image_url: null
+    }
+  ];
+
+  const insertNews = db.prepare('INSERT INTO news (title, content, image_url) VALUES (?, ?, ?)');
+  sampleNews.forEach(n => insertNews.run(n.title, n.content, n.image_url));
+  console.log('Sample news inserted.');
+}
+
+// ─── Express App ──────────────────────────────────────────────────────────────
+
+const app = express();
+
+app.use(cors({ origin: '*' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+// ─── Multer Config ────────────────────────────────────────────────────────────
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Vetëm imazhet lejohen'), false);
+    }
+  }
+});
+
+// ─── Auth Middleware ──────────────────────────────────────────────────────────
+
+function authMiddleware(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token i mungueshëm' });
+  }
+  const token = header.slice(7);
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    const user = db.prepare('SELECT id, first_name, last_name, email, role, avatar, active FROM users WHERE id = ?').get(payload.id);
+    if (!user || !user.active) {
+      return res.status(401).json({ error: 'Llogaria është joaktive ose nuk ekziston' });
+    }
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token i pavlefshëm' });
+  }
+}
+
+function adminMiddleware(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token i mungueshëm' });
+  }
+  const token = header.slice(7);
+  try {
+    const payload = jwt.verify(token, ADMIN_JWT_SECRET);
+    const admin = db.prepare('SELECT id, username FROM admin_users WHERE id = ?').get(payload.id);
+    if (!admin) {
+      return res.status(401).json({ error: 'Admin nuk gjendet' });
+    }
+    req.admin = admin;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token admin i pavlefshëm' });
+  }
+}
+
+// ─── Helper: apiary ownership check ──────────────────────────────────────────
+
+function getOwnedApiary(apiaryId, userId) {
+  return db.prepare('SELECT * FROM apiaries WHERE id = ? AND user_id = ?').get(apiaryId, userId);
+}
+
+function getOwnedHive(hiveId, userId) {
+  return db.prepare(`
+    SELECT h.* FROM hives h
+    JOIN apiaries a ON h.apiary_id = a.id
+    WHERE h.id = ? AND a.user_id = ?
+  `).get(hiveId, userId);
+}
+
+// ─── FILE UPLOAD ──────────────────────────────────────────────────────────────
+
+app.post('/api/upload', authMiddleware, upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nuk u ngarkua asnjë skedar' });
+  }
+  res.json({ url: `/uploads/${req.file.filename}` });
+});
+
+// ─── AUTH ROUTES ──────────────────────────────────────────────────────────────
+
+// POST /api/auth/register
+app.post('/api/auth/register', (req, res) => {
+  const { first_name, last_name, email, password } = req.body;
+  if (!first_name || !last_name || !email || !password) {
+    return res.status(400).json({ error: 'Të gjitha fushat janë të detyrueshme' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Fjalëkalimi duhet të ketë të paktën 6 karaktere' });
+  }
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
+  if (existing) {
+    return res.status(409).json({ error: 'Email-i është regjistruar tashmë' });
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  const result = db.prepare(
+    'INSERT INTO users (first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?)'
+  ).run(first_name.trim(), last_name.trim(), email.toLowerCase().trim(), hash);
+
+  const user = db.prepare('SELECT id, first_name, last_name, email, role, avatar FROM users WHERE id = ?').get(result.lastInsertRowid);
+  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  res.status(201).json({ token, user });
+});
+
+// POST /api/auth/login
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email dhe fjalëkalimi janë të detyrueshëm' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  if (!user) {
+    return res.status(401).json({ error: 'Email ose fjalëkalim i gabuar' });
+  }
+  if (!user.active) {
+    return res.status(403).json({ error: 'Llogaria është e çaktivizuar' });
+  }
+  const valid = bcrypt.compareSync(password, user.password_hash);
+  if (!valid) {
+    return res.status(401).json({ error: 'Email ose fjalëkalim i gabuar' });
+  }
+  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  const { password_hash, reset_token, reset_token_expires, ...safeUser } = user;
+  res.json({ token, user: safeUser });
+});
+
+// POST /api/auth/forgot-password
+app.post('/api/auth/forgot-password', (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email-i është i detyrueshëm' });
+  }
+  const user = db.prepare('SELECT id, email FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  if (!user) {
+    // Don't reveal whether email exists
+    return res.json({ message: 'Nëse email-i ekziston, do të marrësh udhëzime për rivendosjen' });
+  }
+  const token = require('crypto').randomBytes(32).toString('hex');
+  const expires = Date.now() + 3600000; // 1 hour
+  db.prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?').run(token, expires, user.id);
+  // In dev, return the token directly. In production, send via email.
+  res.json({
+    message: 'Token i rivendosjes është gjeneruar',
+    reset_token: token, // dev only
+    expires_in: '1 orë'
+  });
+});
+
+// POST /api/auth/reset-password
+app.post('/api/auth/reset-password', (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return res.status(400).json({ error: 'Token dhe fjalëkalimi janë të detyrueshëm' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Fjalëkalimi duhet të ketë të paktën 6 karaktere' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE reset_token = ?').get(token);
+  if (!user) {
+    return res.status(400).json({ error: 'Token i pavlefshëm' });
+  }
+  if (user.reset_token_expires < Date.now()) {
+    return res.status(400).json({ error: 'Token ka skaduar' });
+  }
+  const hash = bcrypt.hashSync(password, 10);
+  db.prepare('UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?').run(hash, user.id);
+  res.json({ message: 'Fjalëkalimi u rivendos me sukses' });
+});
+
+// GET /api/auth/me
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// ─── APIARIES ─────────────────────────────────────────────────────────────────
+
+// GET /api/apiaries
+app.get('/api/apiaries', authMiddleware, (req, res) => {
+  const apiaries = db.prepare(`
+    SELECT a.*,
+      COUNT(DISTINCT h.id) as hive_count
+    FROM apiaries a
+    LEFT JOIN hives h ON h.apiary_id = a.id
+    WHERE a.user_id = ?
+    GROUP BY a.id
+    ORDER BY a.created_at DESC
+  `).all(req.user.id);
+  res.json(apiaries);
+});
+
+// POST /api/apiaries
+app.post('/api/apiaries', authMiddleware, (req, res) => {
+  const { name, rows, hives_per_row } = req.body;
+  if (!name || !rows || !hives_per_row) {
+    return res.status(400).json({ error: 'Emri, rreshtat dhe kosherët për rresht janë të detyrueshëm' });
+  }
+  const r = parseInt(rows);
+  const c = parseInt(hives_per_row);
+  if (r < 1 || r > 50 || c < 1 || c > 50) {
+    return res.status(400).json({ error: 'Rreshtat dhe kosherët duhet të jenë ndërmjet 1 dhe 50' });
+  }
+
+  const createApiary = db.transaction(() => {
+    const result = db.prepare(
+      'INSERT INTO apiaries (user_id, name, rows, hives_per_row) VALUES (?, ?, ?, ?)'
+    ).run(req.user.id, name.trim(), r, c);
+    const apiaryId = result.lastInsertRowid;
+
+    const insertHive = db.prepare(
+      'INSERT INTO hives (apiary_id, position_row, position_col, unique_code, status) VALUES (?, ?, ?, ?, ?)'
+    );
+    const insertFloor = db.prepare(
+      'INSERT INTO hive_floors (hive_id, floor_number) VALUES (?, 1)'
+    );
+
+    for (let row = 1; row <= r; row++) {
+      for (let col = 1; col <= c; col++) {
+        const code = `K${apiaryId}-R${row}C${col}`;
+        const hiveResult = insertHive.run(apiaryId, row, col, code, 'good');
+        insertFloor.run(hiveResult.lastInsertRowid);
+      }
+    }
+
+    return db.prepare('SELECT * FROM apiaries WHERE id = ?').get(apiaryId);
+  });
+
+  const apiary = createApiary();
+  res.status(201).json(apiary);
+});
+
+// GET /api/apiaries/:id
+app.get('/api/apiaries/:id', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const hives = db.prepare(`
+    SELECT h.*,
+      (SELECT COUNT(*) FROM hive_floors WHERE hive_id = h.id) as floor_count
+    FROM hives h
+    WHERE h.apiary_id = ?
+    ORDER BY h.position_row, h.position_col
+  `).all(apiary.id);
+
+  const hivesWithFloors = hives.map(hive => {
+    const floors = db.prepare('SELECT * FROM hive_floors WHERE hive_id = ? ORDER BY floor_number').all(hive.id);
+    return { ...hive, floors };
+  });
+
+  res.json({ ...apiary, hives: hivesWithFloors });
+});
+
+// PUT /api/apiaries/:id
+app.put('/api/apiaries/:id', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Emri është i detyrueshëm' });
+
+  db.prepare('UPDATE apiaries SET name = ? WHERE id = ?').run(name.trim(), apiary.id);
+  res.json(db.prepare('SELECT * FROM apiaries WHERE id = ?').get(apiary.id));
+});
+
+// DELETE /api/apiaries/:id
+app.delete('/api/apiaries/:id', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const deleteAll = db.transaction(() => {
+    // Cascade manually (some foreign keys may cascade, but be explicit)
+    const hives = db.prepare('SELECT id FROM hives WHERE apiary_id = ?').all(apiary.id);
+    hives.forEach(h => db.prepare('DELETE FROM hive_floors WHERE hive_id = ?').run(h.id));
+
+    const visits = db.prepare('SELECT id FROM visits WHERE apiary_id = ?').all(apiary.id);
+    visits.forEach(v => {
+      const hvds = db.prepare('SELECT id FROM hive_visit_data WHERE visit_id = ?').all(v.id);
+      hvds.forEach(hvd => db.prepare('DELETE FROM hive_floor_visit_data WHERE hive_visit_data_id = ?').run(hvd.id));
+      db.prepare('DELETE FROM hive_visit_data WHERE visit_id = ?').run(v.id);
+    });
+    db.prepare('DELETE FROM visits WHERE apiary_id = ?').run(apiary.id);
+
+    const fps = db.prepare('SELECT id FROM feeding_plans WHERE apiary_id = ?').all(apiary.id);
+    fps.forEach(fp => db.prepare('DELETE FROM feeding_plan_hives WHERE feeding_plan_id = ?').run(fp.id));
+    db.prepare('DELETE FROM feeding_plans WHERE apiary_id = ?').run(apiary.id);
+
+    db.prepare('DELETE FROM hives WHERE apiary_id = ?').run(apiary.id);
+    db.prepare('DELETE FROM apiaries WHERE id = ?').run(apiary.id);
+  });
+
+  deleteAll();
+  res.json({ message: 'Bletaria u fshi me sukses' });
+});
+
+// ─── HIVES ────────────────────────────────────────────────────────────────────
+
+// GET /api/apiaries/:id/hives
+app.get('/api/apiaries/:id/hives', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const hives = db.prepare('SELECT * FROM hives WHERE apiary_id = ? ORDER BY position_row, position_col').all(apiary.id);
+  const hivesWithFloors = hives.map(h => ({
+    ...h,
+    floors: db.prepare('SELECT * FROM hive_floors WHERE hive_id = ? ORDER BY floor_number').all(h.id)
+  }));
+  res.json(hivesWithFloors);
+});
+
+// PUT /api/hives/:id
+app.put('/api/hives/:id', authMiddleware, (req, res) => {
+  const hive = getOwnedHive(req.params.id, req.user.id);
+  if (!hive) return res.status(404).json({ error: 'Kosherjа nuk gjendet' });
+
+  const { status } = req.body;
+  const allowed = ['good', 'weak', 'queenless', 'sick', 'empty', 'strong'];
+  if (status && !allowed.includes(status)) {
+    return res.status(400).json({ error: 'Status i pavlefshëm' });
+  }
+  db.prepare('UPDATE hives SET status = ? WHERE id = ?').run(status || hive.status, hive.id);
+  res.json(db.prepare('SELECT * FROM hives WHERE id = ?').get(hive.id));
+});
+
+// DELETE /api/hives/:id
+app.delete('/api/hives/:id', authMiddleware, (req, res) => {
+  const hive = getOwnedHive(req.params.id, req.user.id);
+  if (!hive) return res.status(404).json({ error: 'Kosherjа nuk gjendet' });
+  db.prepare('DELETE FROM hive_floors WHERE hive_id = ?').run(hive.id);
+  db.prepare('DELETE FROM hives WHERE id = ?').run(hive.id);
+  res.json({ message: 'Kosherjа u fshi me sukses' });
+});
+
+// ─── HIVE FLOORS ──────────────────────────────────────────────────────────────
+
+// POST /api/hives/:id/floors
+app.post('/api/hives/:id/floors', authMiddleware, (req, res) => {
+  const hive = getOwnedHive(req.params.id, req.user.id);
+  if (!hive) return res.status(404).json({ error: 'Kosherjа nuk gjendet' });
+
+  const maxFloor = db.prepare('SELECT MAX(floor_number) as max FROM hive_floors WHERE hive_id = ?').get(hive.id);
+  const nextFloor = (maxFloor.max || 0) + 1;
+
+  const { frames_bees = 0, frames_eggs = 0, frames_honey = 0, frames_new = 0 } = req.body;
+  const result = db.prepare(
+    'INSERT INTO hive_floors (hive_id, floor_number, frames_bees, frames_eggs, frames_honey, frames_new) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(hive.id, nextFloor, frames_bees, frames_eggs, frames_honey, frames_new);
+
+  res.status(201).json(db.prepare('SELECT * FROM hive_floors WHERE id = ?').get(result.lastInsertRowid));
+});
+
+// DELETE /api/floors/:id
+app.delete('/api/floors/:id', authMiddleware, (req, res) => {
+  const floor = db.prepare(`
+    SELECT hf.* FROM hive_floors hf
+    JOIN hives h ON hf.hive_id = h.id
+    JOIN apiaries a ON h.apiary_id = a.id
+    WHERE hf.id = ? AND a.user_id = ?
+  `).get(req.params.id, req.user.id);
+
+  if (!floor) return res.status(404).json({ error: 'Kati nuk gjendet' });
+
+  const floorCount = db.prepare('SELECT COUNT(*) as c FROM hive_floors WHERE hive_id = ?').get(floor.hive_id);
+  if (floorCount.c <= 1) {
+    return res.status(400).json({ error: 'Kosherjа duhet të ketë të paktën një kat' });
+  }
+
+  db.prepare('DELETE FROM hive_floors WHERE id = ?').run(floor.id);
+  res.json({ message: 'Kati u fshi me sukses' });
+});
+
+// ─── VISITS ───────────────────────────────────────────────────────────────────
+
+// GET /api/apiaries/:id/visits
+app.get('/api/apiaries/:id/visits', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const visits = db.prepare(`
+    SELECT v.*,
+      COUNT(hvd.id) as hives_visited
+    FROM visits v
+    LEFT JOIN hive_visit_data hvd ON hvd.visit_id = v.id
+    WHERE v.apiary_id = ?
+    GROUP BY v.id
+    ORDER BY v.visit_date DESC, v.created_at DESC
+  `).all(apiary.id);
+
+  res.json(visits);
+});
+
+// POST /api/apiaries/:id/visits
+app.post('/api/apiaries/:id/visits', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const { visit_date, notes, hive_data } = req.body;
+  if (!visit_date) return res.status(400).json({ error: 'Data e vizitës është e detyrueshme' });
+
+  const createVisit = db.transaction(() => {
+    const visitResult = db.prepare(
+      'INSERT INTO visits (apiary_id, visit_date, notes) VALUES (?, ?, ?)'
+    ).run(apiary.id, visit_date, notes || null);
+    const visitId = visitResult.lastInsertRowid;
+
+    if (Array.isArray(hive_data)) {
+      const insertHvd = db.prepare(`
+        INSERT INTO hive_visit_data (visit_id, hive_id, queen_present, queen_age_months, status, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const insertFloorVd = db.prepare(`
+        INSERT INTO hive_floor_visit_data (hive_visit_data_id, floor_id, frames_bees, frames_eggs, frames_honey, frames_new)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const updateHiveStatus = db.prepare('UPDATE hives SET status = ? WHERE id = ?');
+
+      hive_data.forEach(hd => {
+        // Verify hive belongs to this apiary
+        const hive = db.prepare('SELECT id FROM hives WHERE id = ? AND apiary_id = ?').get(hd.hive_id, apiary.id);
+        if (!hive) return;
+
+        const hvdResult = insertHvd.run(
+          visitId,
+          hd.hive_id,
+          hd.queen_present !== undefined ? (hd.queen_present ? 1 : 0) : 1,
+          hd.queen_age_months || null,
+          hd.status || 'good',
+          hd.notes || null
+        );
+        const hvdId = hvdResult.lastInsertRowid;
+
+        // Update hive current status
+        if (hd.status) {
+          updateHiveStatus.run(hd.status, hd.hive_id);
+        }
+
+        if (Array.isArray(hd.floor_data)) {
+          hd.floor_data.forEach(fd => {
+            // Verify floor belongs to this hive
+            const floor = db.prepare('SELECT id FROM hive_floors WHERE id = ? AND hive_id = ?').get(fd.floor_id, hd.hive_id);
+            if (!floor) return;
+            insertFloorVd.run(
+              hvdId,
+              fd.floor_id,
+              fd.frames_bees !== undefined ? fd.frames_bees : null,
+              fd.frames_eggs !== undefined ? fd.frames_eggs : null,
+              fd.frames_honey !== undefined ? fd.frames_honey : null,
+              fd.frames_new !== undefined ? fd.frames_new : null
+            );
+          });
+        }
+      });
+    }
+
+    return db.prepare('SELECT * FROM visits WHERE id = ?').get(visitId);
+  });
+
+  const visit = createVisit();
+  res.status(201).json(visit);
+});
+
+// GET /api/visits/:id
+app.get('/api/visits/:id', authMiddleware, (req, res) => {
+  const visit = db.prepare(`
+    SELECT v.* FROM visits v
+    JOIN apiaries a ON v.apiary_id = a.id
+    WHERE v.id = ? AND a.user_id = ?
+  `).get(req.params.id, req.user.id);
+
+  if (!visit) return res.status(404).json({ error: 'Vizita nuk gjendet' });
+
+  const hiveData = db.prepare('SELECT * FROM hive_visit_data WHERE visit_id = ?').all(visit.id);
+  const enriched = hiveData.map(hvd => {
+    const floorData = db.prepare('SELECT * FROM hive_floor_visit_data WHERE hive_visit_data_id = ?').all(hvd.id);
+    const hive = db.prepare('SELECT id, unique_code, position_row, position_col, status FROM hives WHERE id = ?').get(hvd.hive_id);
+    return { ...hvd, hive, floor_data: floorData };
+  });
+
+  res.json({ ...visit, hive_data: enriched });
+});
+
+// ─── FEEDING PLANS ────────────────────────────────────────────────────────────
+
+// GET /api/apiaries/:id/feeding-plans
+app.get('/api/apiaries/:id/feeding-plans', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const plans = db.prepare(`
+    SELECT fp.*,
+      COUNT(fph.id) as hive_count
+    FROM feeding_plans fp
+    LEFT JOIN feeding_plan_hives fph ON fph.feeding_plan_id = fp.id
+    WHERE fp.apiary_id = ?
+    GROUP BY fp.id
+    ORDER BY fp.plan_date DESC
+  `).all(apiary.id);
+
+  res.json(plans);
+});
+
+// POST /api/apiaries/:id/feeding-plans
+app.post('/api/apiaries/:id/feeding-plans', authMiddleware, (req, res) => {
+  const apiary = getOwnedApiary(req.params.id, req.user.id);
+  if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
+
+  const { plan_date, description, hive_plans } = req.body;
+  if (!plan_date) return res.status(400).json({ error: 'Data e planit është e detyrueshme' });
+
+  const createPlan = db.transaction(() => {
+    const result = db.prepare(
+      'INSERT INTO feeding_plans (apiary_id, plan_date, description) VALUES (?, ?, ?)'
+    ).run(apiary.id, plan_date, description || null);
+    const planId = result.lastInsertRowid;
+
+    if (Array.isArray(hive_plans)) {
+      const insertHp = db.prepare(
+        'INSERT INTO feeding_plan_hives (feeding_plan_id, hive_id, food_amount, medicine, notes) VALUES (?, ?, ?, ?, ?)'
+      );
+      hive_plans.forEach(hp => {
+        const hive = db.prepare('SELECT id FROM hives WHERE id = ? AND apiary_id = ?').get(hp.hive_id, apiary.id);
+        if (!hive) return;
+        insertHp.run(planId, hp.hive_id, hp.food_amount || null, hp.medicine || null, hp.notes || null);
+      });
+    }
+
+    return db.prepare('SELECT * FROM feeding_plans WHERE id = ?').get(planId);
+  });
+
+  const plan = createPlan();
+  res.status(201).json(plan);
+});
+
+// ─── COMMUNITY ────────────────────────────────────────────────────────────────
+
+// GET /api/posts
+app.get('/api/posts', (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+  const offset = (page - 1) * limit;
+
+  // Try to get current user from token (optional auth)
+  let currentUserId = null;
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Bearer ')) {
+    try {
+      const payload = jwt.verify(header.slice(7), JWT_SECRET);
+      currentUserId = payload.id;
+    } catch (e) { /* ignore */ }
+  }
+
+  const total = db.prepare('SELECT COUNT(*) as c FROM community_posts').get().c;
+  const posts = db.prepare(`
+    SELECT p.id, p.content, p.image_url, p.likes, p.created_at,
+      u.id as user_id, u.first_name, u.last_name, u.avatar,
+      (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count
+    FROM community_posts p
+    JOIN users u ON p.user_id = u.id
+    ORDER BY p.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(limit, offset);
+
+  const enriched = posts.map(p => ({
+    ...p,
+    liked_by_me: currentUserId
+      ? !!db.prepare('SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?').get(p.id, currentUserId)
+      : false
+  }));
+
+  res.json({
+    posts: enriched,
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+  });
+});
+
+// POST /api/posts
+app.post('/api/posts', authMiddleware, (req, res) => {
+  const { content, image_url } = req.body;
+  if (!content || !content.trim()) {
+    return res.status(400).json({ error: 'Përmbajtja është e detyrueshme' });
+  }
+  const result = db.prepare(
+    'INSERT INTO community_posts (user_id, content, image_url) VALUES (?, ?, ?)'
+  ).run(req.user.id, content.trim(), image_url || null);
+
+  const post = db.prepare(`
+    SELECT p.*, u.first_name, u.last_name, u.avatar
+    FROM community_posts p JOIN users u ON p.user_id = u.id
+    WHERE p.id = ?
+  `).get(result.lastInsertRowid);
+
+  res.status(201).json(post);
+});
+
+// DELETE /api/posts/:id
+app.delete('/api/posts/:id', authMiddleware, (req, res) => {
+  const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Postimi nuk gjendet' });
+  if (post.user_id !== req.user.id) return res.status(403).json({ error: 'Nuk mund ta fshish këtë postim' });
+
+  db.prepare('DELETE FROM comments WHERE post_id = ?').run(post.id);
+  db.prepare('DELETE FROM post_likes WHERE post_id = ?').run(post.id);
+  db.prepare('DELETE FROM community_posts WHERE id = ?').run(post.id);
+  res.json({ message: 'Postimi u fshi me sukses' });
+});
+
+// POST /api/posts/:id/comments
+app.post('/api/posts/:id/comments', authMiddleware, (req, res) => {
+  const post = db.prepare('SELECT id FROM community_posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Postimi nuk gjendet' });
+
+  const { content } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'Komenti nuk mund të jetë bosh' });
+
+  const result = db.prepare(
+    'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)'
+  ).run(post.id, req.user.id, content.trim());
+
+  const comment = db.prepare(`
+    SELECT c.*, u.first_name, u.last_name, u.avatar
+    FROM comments c JOIN users u ON c.user_id = u.id
+    WHERE c.id = ?
+  `).get(result.lastInsertRowid);
+
+  res.status(201).json(comment);
+});
+
+// GET /api/posts/:id/comments
+app.get('/api/posts/:id/comments', (req, res) => {
+  const post = db.prepare('SELECT id FROM community_posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Postimi nuk gjendet' });
+
+  const comments = db.prepare(`
+    SELECT c.*, u.first_name, u.last_name, u.avatar
+    FROM comments c JOIN users u ON c.user_id = u.id
+    WHERE c.post_id = ?
+    ORDER BY c.created_at ASC
+  `).all(post.id);
+
+  res.json(comments);
+});
+
+// POST /api/posts/:id/like
+app.post('/api/posts/:id/like', authMiddleware, (req, res) => {
+  const post = db.prepare('SELECT * FROM community_posts WHERE id = ?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Postimi nuk gjendet' });
+
+  const existing = db.prepare('SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?').get(post.id, req.user.id);
+
+  const toggleLike = db.transaction(() => {
+    if (existing) {
+      db.prepare('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?').run(post.id, req.user.id);
+      db.prepare('UPDATE community_posts SET likes = MAX(0, likes - 1) WHERE id = ?').run(post.id);
+      return { liked: false };
+    } else {
+      db.prepare('INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)').run(post.id, req.user.id);
+      db.prepare('UPDATE community_posts SET likes = likes + 1 WHERE id = ?').run(post.id);
+      return { liked: true };
+    }
+  });
+
+  const result = toggleLike();
+  const updated = db.prepare('SELECT likes FROM community_posts WHERE id = ?').get(post.id);
+  res.json({ ...result, likes: updated.likes });
+});
+
+// ─── MARKETPLACE ──────────────────────────────────────────────────────────────
+
+// GET /api/listings
+app.get('/api/listings', (req, res) => {
+  const { category, min_price, max_price, search } = req.query;
+
+  let query = `
+    SELECT ml.*, u.first_name, u.last_name
+    FROM marketplace_listings ml
+    JOIN users u ON ml.user_id = u.id
+    WHERE (ml.expires_at IS NULL OR datetime(ml.expires_at) > datetime('now'))
+  `;
+  const params = [];
+
+  if (category) {
+    query += ' AND ml.category = ?';
+    params.push(category);
+  }
+  if (min_price !== undefined && min_price !== '') {
+    query += ' AND ml.price >= ?';
+    params.push(parseFloat(min_price));
+  }
+  if (max_price !== undefined && max_price !== '') {
+    query += ' AND ml.price <= ?';
+    params.push(parseFloat(max_price));
+  }
+  if (search) {
+    query += ' AND (ml.title LIKE ? OR ml.description LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`);
+  }
+
+  query += ' ORDER BY ml.created_at DESC';
+
+  res.json(db.prepare(query).all(...params));
+});
+
+// POST /api/listings
+app.post('/api/listings', authMiddleware, (req, res) => {
+  const { title, description, price, category, image_url, contact } = req.body;
+  if (!title || !title.trim()) return res.status(400).json({ error: 'Titulli është i detyrueshëm' });
+
+  const setting = db.prepare("SELECT value FROM app_settings WHERE key = 'listing_expiry_days'").get();
+  const expiryDays = parseInt(setting ? setting.value : '30');
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + expiryDays);
+
+  const result = db.prepare(
+    'INSERT INTO marketplace_listings (user_id, title, description, price, category, image_url, contact, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    req.user.id,
+    title.trim(),
+    description || null,
+    price !== undefined ? parseFloat(price) : null,
+    category || null,
+    image_url || null,
+    contact || null,
+    expiresAt.toISOString()
+  );
+
+  res.status(201).json(db.prepare('SELECT * FROM marketplace_listings WHERE id = ?').get(result.lastInsertRowid));
+});
+
+// DELETE /api/listings/:id
+app.delete('/api/listings/:id', authMiddleware, (req, res) => {
+  const listing = db.prepare('SELECT * FROM marketplace_listings WHERE id = ?').get(req.params.id);
+  if (!listing) return res.status(404).json({ error: 'Listimi nuk gjendet' });
+  if (listing.user_id !== req.user.id) return res.status(403).json({ error: 'Nuk mund ta fshish këtë listim' });
+
+  db.prepare('DELETE FROM marketplace_listings WHERE id = ?').run(listing.id);
+  res.json({ message: 'Listimi u fshi me sukses' });
+});
+
+// ─── NEWS ─────────────────────────────────────────────────────────────────────
+
+// GET /api/news
+app.get('/api/news', (req, res) => {
+  const news = db.prepare('SELECT * FROM news ORDER BY created_at DESC LIMIT 10').all();
+  res.json(news);
+});
+
+// GET /api/news/:id
+app.get('/api/news/:id', (req, res) => {
+  const article = db.prepare('SELECT * FROM news WHERE id = ?').get(req.params.id);
+  if (!article) return res.status(404).json({ error: 'Lajmi nuk gjendet' });
+  res.json(article);
+});
+
+// ─── AI RECOMMENDATIONS ───────────────────────────────────────────────────────
+
+function callClaudeAPI(prompt) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: 'Ti je asistent i specializuar në bletari. Jep këshilla të detajuara dhe praktike për bletarët. Përgjigjju në gjuhën shqipe.',
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const options = {
+      hostname: 'api.anthropic.com',
+      port: 443,
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.content && parsed.content[0]) {
+            resolve(parsed.content[0].text);
+          } else if (parsed.error) {
+            reject(new Error(parsed.error.message));
+          } else {
+            reject(new Error('Përgjigje e papritur nga API'));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+function getMockRecommendation(prompt) {
+  const lowerPrompt = (prompt || '').toLowerCase();
+  if (lowerPrompt.includes('varroa') || lowerPrompt.includes('parazit')) {
+    return `Këshilla për luftimin e Varroa destructor:
+
+1. **Monitorimi i rregullt**: Kontrolloni numrin e acarëve çdo muaj duke përdorur metodën e rrëshqitjes alkoolike. Mbi 3 acarë/100 blete tregon nevojën për trajtim.
+
+2. **Trajtimi me acid oksalik**: Metoda më efektive gjatë dimrit kur kolonia është pa pjellë. Zbatoni 3-5% tretësirë me pikon ose avullim.
+
+3. **Heqja e pjellës së dronëve**: Teknikë biologjike - shtoni kornizë "kurth" dhe hiqni pjellën e mbyllur të dronëve çdo 9-10 ditë.
+
+4. **Rrotullimi i barnave**: Shmangni rezistencën duke alternuar midis acidi oksalik, acid formik dhe timolik.
+
+5. **Koha optimale**: Trajtimi duhet bërë nga shtatori deri në nëntor dhe gjatë periudhave pa pjellë.
+
+Konsultohuni gjithmonë me veterinerin vendor para çdo trajtimi kimik.`;
+  }
+  if (lowerPrompt.includes('mbretëreshë') || lowerPrompt.includes('mbretereshe')) {
+    return `Këshilla mbi menaxhimin e mbretëreshës:
+
+1. **Identifikimi**: Mbretëresha është më e gjatë se bletët punëtore, me bark të zgjatur. Shpesh shënohet me bojë sipas vitit të lindjes.
+
+2. **Kontrolli i moshës**: Mbretëresha prodhon feromon maksimal deri në 2 vjeç. Pas kësaj kohe efektiviteti zvogëlohet dhe kolonia mund të bjerë.
+
+3. **Ndërrimi natyral**: Bletët shpesh bëjnë ndërrimin natyral të mbretëreshës (supersedure). Kjo zakonisht ndodh pa roj.
+
+4. **Ndërrimi artificial**: Planifikojeni gjatë sezonit kur dronët janë të pranishëm (prill-gusht). Vendosni mbretëreshë të re nga raca e mirë.
+
+5. **Shenjat e mbretëreshës pa pllenë**: Pjellë e shpërndarë, qeliza te varrosura çrregullisht, bletë punëtore me vezë (sinjal rëndues).
+
+Rekomandohet të ndërroni mbretëreshën çdo 1-2 vjet për prodhimtari maksimale.`;
+  }
+  return `Këshilla të përgjithshme për bletari:
+
+1. **Vizitat e rregullta**: Inspektoni kosherët çdo 7-10 ditë gjatë sezonit aktiv. Shënoni çdo ndryshim që vërejtni.
+
+2. **Ushqyerja**: Plotësoni rezervat e mjaltit dhe polenës gjatë periudhave të mungesës. Përdorni sheqer 1:1 (ujë:sheqer) si ushqim emergjent.
+
+3. **Higjiena**: Mbani pajisjet të pastra dhe dezinfektuara. Zëvendësoni kornizat e vjetra (mbi 3-4 vjet) rregullisht.
+
+4. **Mbrojtja nga pemishtja**: Poziciononi bletarinë larg pesticideve dhe afër burimeve ujore të pastra.
+
+5. **Shënimet**: Mbani ditar të detajuar për çdo koshëre - mbretëresha, forca e kolonisë, prodhimtaria, trajtimet.
+
+6. **Dimërim i mirë**: Sigurohuni që çdo koshëre hyn në dimër me të paktën 15-18 kg ushqim dhe popullsi të mjaftueshme.
+
+A keni pyetje specifike rreth bletarisë suaj?`;
+}
+
+// POST /api/ai/recommend
+app.post('/api/ai/recommend', authMiddleware, async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt || !prompt.trim()) {
+    return res.status(400).json({ error: 'Pyetja është e detyrueshme' });
+  }
+
+  const monthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+
+  // Check and increment usage atomically
+  const checkAndIncrement = db.transaction(() => {
+    const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND month_year = ?').get(req.user.id, monthYear);
+    const current = usage ? usage.count : 0;
+    if (current >= AI_MONTHLY_LIMIT) {
+      return null; // Over limit
+    }
+    db.prepare(`
+      INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 1)
+      ON CONFLICT(user_id, month_year) DO UPDATE SET count = count + 1
+    `).run(req.user.id, monthYear);
+    return current + 1;
+  });
+
+  const newCount = checkAndIncrement();
+  if (newCount === null) {
+    return res.status(429).json({
+      error: `Keni arritur limitin mujor prej ${AI_MONTHLY_LIMIT} kërkesave AI. Provo sërish muajin e ardhshëm.`,
+      limit: AI_MONTHLY_LIMIT,
+      used: AI_MONTHLY_LIMIT
+    });
+  }
+
+  try {
+    let recommendation;
+    if (CLAUDE_API_KEY) {
+      recommendation = await callClaudeAPI(prompt.trim());
+    } else {
+      recommendation = getMockRecommendation(prompt.trim());
+    }
+    res.json({
+      recommendation,
+      usage: { used: newCount, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - newCount }
+    });
+  } catch (err) {
+    console.error('AI API error:', err.message);
+    // On API error, return mock and don't deduct the usage
+    db.prepare(`
+      INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 0)
+      ON CONFLICT(user_id, month_year) DO UPDATE SET count = MAX(0, count - 1)
+    `).run(req.user.id, monthYear);
+
+    const recommendation = getMockRecommendation(prompt.trim());
+    res.json({
+      recommendation,
+      usage: { used: newCount - 1, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - (newCount - 1) },
+      note: 'Përgjigje lokale (API e jashtme nuk ishte e disponueshme)'
+    });
+  }
+});
+
+// ─── ADMIN ROUTES ─────────────────────────────────────────────────────────────
+
+// POST /api/admin/login
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username dhe fjalëkalimi janë të detyrueshëm' });
+
+  const admin = db.prepare('SELECT * FROM admin_users WHERE username = ?').get(username);
+  if (!admin) return res.status(401).json({ error: 'Kredencialet janë të gabuara' });
+
+  const valid = bcrypt.compareSync(password, admin.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Kredencialet janë të gabuara' });
+
+  const token = jwt.sign({ id: admin.id, username: admin.username, role: 'admin' }, ADMIN_JWT_SECRET, { expiresIn: '8h' });
+  res.json({ token, admin: { id: admin.id, username: admin.username } });
+});
+
+// GET /api/admin/stats
+app.get('/api/admin/stats', adminMiddleware, (req, res) => {
+  const stats = {
+    total_users: db.prepare('SELECT COUNT(*) as c FROM users').get().c,
+    active_users: db.prepare('SELECT COUNT(*) as c FROM users WHERE active = 1').get().c,
+    total_posts: db.prepare('SELECT COUNT(*) as c FROM community_posts').get().c,
+    total_apiaries: db.prepare('SELECT COUNT(*) as c FROM apiaries').get().c,
+    total_hives: db.prepare('SELECT COUNT(*) as c FROM hives').get().c,
+    total_listings: db.prepare('SELECT COUNT(*) as c FROM marketplace_listings').get().c,
+    total_news: db.prepare('SELECT COUNT(*) as c FROM news').get().c,
+    total_visits: db.prepare('SELECT COUNT(*) as c FROM visits').get().c
+  };
+  res.json(stats);
+});
+
+// GET /api/admin/users
+app.get('/api/admin/users', adminMiddleware, (req, res) => {
+  const users = db.prepare(`
+    SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.active, u.created_at,
+      COUNT(DISTINCT a.id) as apiary_count,
+      COUNT(DISTINCT p.id) as post_count
+    FROM users u
+    LEFT JOIN apiaries a ON a.user_id = u.id
+    LEFT JOIN community_posts p ON p.user_id = u.id
+    GROUP BY u.id
+    ORDER BY u.created_at DESC
+  `).all();
+  res.json(users);
+});
+
+// PATCH /api/admin/users/:id/toggle
+app.patch('/api/admin/users/:id/toggle', adminMiddleware, (req, res) => {
+  const user = db.prepare('SELECT id, active FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Përdoruesi nuk gjendet' });
+
+  const newActive = user.active ? 0 : 1;
+  db.prepare('UPDATE users SET active = ? WHERE id = ?').run(newActive, user.id);
+  res.json({ id: user.id, active: newActive });
+});
+
+// GET /api/admin/listings
+app.get('/api/admin/listings', adminMiddleware, (req, res) => {
+  const listings = db.prepare(`
+    SELECT ml.*, u.first_name, u.last_name, u.email
+    FROM marketplace_listings ml
+    JOIN users u ON ml.user_id = u.id
+    ORDER BY ml.created_at DESC
+  `).all();
+  res.json(listings);
+});
+
+// DELETE /api/admin/listings/:id
+app.delete('/api/admin/listings/:id', adminMiddleware, (req, res) => {
+  const listing = db.prepare('SELECT id FROM marketplace_listings WHERE id = ?').get(req.params.id);
+  if (!listing) return res.status(404).json({ error: 'Listimi nuk gjendet' });
+  db.prepare('DELETE FROM marketplace_listings WHERE id = ?').run(listing.id);
+  res.json({ message: 'Listimi u fshi me sukses' });
+});
+
+// GET /api/admin/news
+app.get('/api/admin/news', adminMiddleware, (req, res) => {
+  res.json(db.prepare('SELECT * FROM news ORDER BY created_at DESC').all());
+});
+
+// POST /api/admin/news
+app.post('/api/admin/news', adminMiddleware, (req, res) => {
+  const { title, content, image_url } = req.body;
+  if (!title || !content) return res.status(400).json({ error: 'Titulli dhe përmbajtja janë të detyrueshme' });
+
+  const result = db.prepare(
+    'INSERT INTO news (title, content, image_url, admin_id) VALUES (?, ?, ?, ?)'
+  ).run(title.trim(), content.trim(), image_url || null, req.admin.id);
+
+  res.status(201).json(db.prepare('SELECT * FROM news WHERE id = ?').get(result.lastInsertRowid));
+});
+
+// PUT /api/admin/news/:id
+app.put('/api/admin/news/:id', adminMiddleware, (req, res) => {
+  const article = db.prepare('SELECT id FROM news WHERE id = ?').get(req.params.id);
+  if (!article) return res.status(404).json({ error: 'Lajmi nuk gjendet' });
+
+  const { title, content, image_url } = req.body;
+  if (!title || !content) return res.status(400).json({ error: 'Titulli dhe përmbajtja janë të detyrueshme' });
+
+  db.prepare('UPDATE news SET title = ?, content = ?, image_url = ? WHERE id = ?')
+    .run(title.trim(), content.trim(), image_url || null, article.id);
+
+  res.json(db.prepare('SELECT * FROM news WHERE id = ?').get(article.id));
+});
+
+// DELETE /api/admin/news/:id
+app.delete('/api/admin/news/:id', adminMiddleware, (req, res) => {
+  const article = db.prepare('SELECT id FROM news WHERE id = ?').get(req.params.id);
+  if (!article) return res.status(404).json({ error: 'Lajmi nuk gjendet' });
+  db.prepare('DELETE FROM news WHERE id = ?').run(article.id);
+  res.json({ message: 'Lajmi u fshi me sukses' });
+});
+
+// GET /api/admin/settings
+app.get('/api/admin/settings', adminMiddleware, (req, res) => {
+  const settings = db.prepare('SELECT * FROM app_settings').all();
+  const result = {};
+  settings.forEach(s => { result[s.key] = s.value; });
+  res.json(result);
+});
+
+// PUT /api/admin/settings
+app.put('/api/admin/settings', adminMiddleware, (req, res) => {
+  const { listing_expiry_days } = req.body;
+
+  if (listing_expiry_days !== undefined) {
+    const days = parseInt(listing_expiry_days);
+    if (isNaN(days) || days < 1 || days > 365) {
+      return res.status(400).json({ error: 'listing_expiry_days duhet të jetë ndërmjet 1 dhe 365' });
+    }
+    db.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('listing_expiry_days', ?)").run(String(days));
+  }
+
+  const settings = db.prepare('SELECT * FROM app_settings').all();
+  const result = {};
+  settings.forEach(s => { result[s.key] = s.value; });
+  res.json(result);
+});
+
+// ─── Health Check ─────────────────────────────────────────────────────────────
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', app: 'Bletaria Ime', time: new Date().toISOString() });
+});
+
+// ─── 404 + Error Handler ──────────────────────────────────────────────────────
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Rruga nuk ekziston' });
+});
+
+app.use((err, req, res, next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'Skedari është shumë i madh (max 2MB)' });
+  }
+  console.error('Server error:', err.message);
+  res.status(500).json({ error: 'Gabim i brendshëm i serverit' });
+});
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+
+app.listen(PORT, () => {
+  console.log(`Bletaria Ime backend running on port ${PORT}`);
+  console.log(`Database: ${DB_PATH}`);
+  console.log(`Uploads: ${UPLOADS_DIR}`);
+  console.log(`Claude AI: ${CLAUDE_API_KEY ? 'Enabled' : 'Mock mode'}`);
+});
