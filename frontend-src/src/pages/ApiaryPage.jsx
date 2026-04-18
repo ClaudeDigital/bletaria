@@ -131,28 +131,46 @@ function HiveDetailModal({ hive, apiaryId, onClose, onUpdated }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">👑 Mbretëresha</label>
-              <select className="form-control" value={queen} onChange={e => setQueen(e.target.value)}>
-                <option value="po">✅ E pranishme</option>
-                <option value="jo">⚠️ Mungon</option>
-              </select>
-            </div>
-            {queen === 'po' && (
-              <div className="form-group">
-                <label className="form-label">📅 Mosha (muaj)</label>
-                <input type="number" className="form-control" min="0" max="60" value={queenAge}
-                  onChange={e => setQueenAge(e.target.value)} placeholder="0" />
+          {status !== 'empty' && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">👑 Mbretëresha</label>
+                  <select className="form-control" value={queen} onChange={e => setQueen(e.target.value)}>
+                    <option value="po">✅ E pranishme</option>
+                    <option value="jo">⚠️ Mungon</option>
+                  </select>
+                </div>
+                {queen === 'po' && (
+                  <div className="form-group">
+                    <label className="form-label">📅 Mosha (muaj)</label>
+                    <input type="number" className="form-control" min="0" max="60" value={queenAge}
+                      onChange={e => setQueenAge(e.target.value)} placeholder="p.sh. 12" />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">📝 Shënime</label>
-            <textarea className="form-control" rows={3} value={notes}
-              onChange={e => setNotes(e.target.value)} placeholder="Shënime për këtë koshère..." />
-          </div>
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={notes !== ''}
+                    onChange={e => { if (!e.target.checked) setNotes('') }}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  📝 Shto Shënim
+                </label>
+                {notes !== '' || (
+                  <button type="button" style={{ fontSize: '0.8rem', color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    onClick={() => setNotes(' ')}>+ Shto shënim</button>
+                )}
+                {notes !== '' && (
+                  <textarea className="form-control" rows={2} value={notes}
+                    onChange={e => setNotes(e.target.value)} placeholder="Shënime për këtë koshère..." autoFocus />
+                )}
+              </div>
+            </>
+          )}
         </div>
         <div className="modal-footer">
           <Link to={`/hive/${hive.id}`} className="btn btn-ghost btn-sm" onClick={onClose}>

@@ -609,13 +609,18 @@ app.put('/api/hives/:id', authMiddleware, (req, res) => {
   const hive = getOwnedHive(req.params.id, req.user.id);
   if (!hive) return res.status(404).json({ error: 'Kosherjа nuk gjendet' });
 
-  const { status } = req.body;
+  const { status, queen_present, queen_age_months, notes } = req.body;
   const allowed = ['good', 'problem', 'dead', 'weak', 'queenless', 'sick', 'empty', 'strong'];
   if (status && !allowed.includes(status)) {
     return res.status(400).json({ error: 'Status i pavlefshëm' });
   }
-  db.prepare('UPDATE hives SET status = ? WHERE id = ?').run(status || hive.status, hive.id);
-  res.json(db.prepare('SELECT * FROM hives WHERE id = ?').get(hive.id));
+  const qp = queen_present !== undefined ? (queen_present ? 1 : 0) : hive.queen_present;
+  const qa = queen_age_months !== undefined ? (queen_age_months ? parseInt(queen_age_months) : null) : hive.queen_age_months;
+  const nt = notes !== undefined ? notes : hive.notes;
+  db.prepare('UPDATE hives SET status = ?, queen_present = ?, queen_age_months = ?, notes = ? WHERE id = ?')
+    .run(status || hive.status, qp ?? 1, qa, nt, hive.id);
+  const updated = db.prepare('SELECT * FROM hives WHERE id = ?').get(hive.id);
+  res.json({ ...updated, code: updated.unique_code });
 });
 
 // DELETE /api/hives/:id
@@ -1422,7 +1427,7 @@ app.get('/api/hives', authMiddleware, (req, res) => {
   if (!apiary_id) return res.status(400).json({ error: 'apiary_id kërkohet' });
   const apiary = getOwnedApiary(apiary_id, req.user.id);
   if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
-  const hives = db.prepare('SELECT h.*, COALESCE((SELECT queen_present FROM hive_visit_data hvd JOIN visits v ON hvd.visit_id = v.id WHERE hvd.hive_id = h.id ORDER BY v.visit_date DESC LIMIT 1), 1) as queen_present, (SELECT queen_age_months FROM hive_visit_data hvd JOIN visits v ON hvd.visit_id = v.id WHERE hvd.hive_id = h.id ORDER BY v.visit_date DESC LIMIT 1) as queen_age_months FROM hives h WHERE h.apiary_id = ? ORDER BY h.position_row, h.position_col').all(apiary_id);
+  const hives = db.prepare('SELECT h.*, COALESCE(h.queen_present, 1) as queen_present, h.queen_age_months, h.notes FROM hives h WHERE h.apiary_id = ? ORDER BY h.position_row, h.position_col').all(apiary_id);
   const hivesWithFloors = hives.map(h => ({ ...h, floors: db.prepare('SELECT * FROM hive_floors WHERE hive_id = ? ORDER BY floor_number').all(h.id), code: h.unique_code }));
   res.json(hivesWithFloors);
 });

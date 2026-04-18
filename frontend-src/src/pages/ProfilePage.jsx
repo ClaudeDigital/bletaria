@@ -9,6 +9,21 @@ const EXPERIENCE_LABELS = {
   profesional: '🏆 Profesionist',
 }
 
+const NOTIF_ITEMS = [
+  { key: 'visit_reminder', label: '📅 Kujtues vizitash', desc: 'Njoftim çdo javë nëse nuk ke vizituar kopshtin' },
+  { key: 'community_reply', label: '💬 Përgjigje komuniteti', desc: 'Kur dikush komenton postimet tuaja' },
+  { key: 'marketplace', label: '🛒 Marketplace', desc: 'Listim të reja të ngjashme me interesat tuaja' },
+  { key: 'ai_tips', label: '🤖 Këshilla AI', desc: 'Këshilla sezonale nga Bletari AI' },
+]
+
+function loadNotifPrefs() {
+  try {
+    const saved = localStorage.getItem('bletaria_notif_prefs')
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return { visit_reminder: true, community_reply: true, marketplace: false, ai_tips: true }
+}
+
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
@@ -24,6 +39,15 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [notifPrefs, setNotifPrefs] = useState(loadNotifPrefs)
+  const [notifSaved, setNotifSaved] = useState(false)
+
+  const toggleNotif = (key) => setNotifPrefs(prev => ({ ...prev, [key]: !prev[key] }))
+  const saveNotifPrefs = () => {
+    localStorage.setItem('bletaria_notif_prefs', JSON.stringify(notifPrefs))
+    setNotifSaved(true)
+    setTimeout(() => setNotifSaved(false), 2000)
+  }
 
   useEffect(() => {
     loadStats()
@@ -273,50 +297,61 @@ export default function ProfilePage() {
         {activeTab === 'notifications' && (
           <div className="card card-body">
             <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem' }}>🔔 Preferencat e Njoftimeve</h3>
+            {notifSaved && (
+              <div className="alert" style={{ background: 'rgba(74,124,89,0.15)', color: 'var(--green)', border: '1px solid var(--green)', borderRadius: 'var(--radius-sm)', padding: '0.6rem 1rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                ✅ Preferencat u ruajtën!
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[
-                { key: 'visit_reminder', label: '📅 Kujtues vizitash', desc: 'Njoftim çdo javë nëse nuk ke vizituar kopshtin' },
-                { key: 'community_reply', label: '💬 Përgjigje komuniteti', desc: 'Kur dikush komenton postimet tuaja' },
-                { key: 'marketplace', label: '🛒 Marketplace', desc: 'Listim të reja të ngjashme me interesat tuaja' },
-                { key: 'ai_tips', label: '🤖 Këshilla AI', desc: 'Këshilla sezonale nga Bletari AI' },
-              ].map((n, i) => (
-                <div key={n.key} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '1rem',
-                  padding: '0.75rem 0',
-                  borderBottom: i < 3 ? '1px solid var(--border)' : 'none',
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{n.label}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{n.desc}</div>
-                  </div>
-                  <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked style={{ opacity: 0, width: 0, height: 0 }} />
-                    <span style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'var(--green)',
-                      borderRadius: '24px',
-                      transition: 'background 0.2s',
-                    }}>
+              {NOTIF_ITEMS.map((n, i) => {
+                const isOn = notifPrefs[n.key]
+                return (
+                  <div key={n.key} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    padding: '0.75rem 0',
+                    borderBottom: i < NOTIF_ITEMS.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{n.label}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{n.desc}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleNotif(n.key)}
+                      style={{
+                        position: 'relative',
+                        display: 'inline-block',
+                        width: '44px',
+                        height: '24px',
+                        cursor: 'pointer',
+                        background: isOn ? 'var(--green)' : 'var(--border)',
+                        borderRadius: '24px',
+                        border: 'none',
+                        transition: 'background 0.2s',
+                        flexShrink: 0,
+                      }}
+                    >
                       <span style={{
                         position: 'absolute',
-                        left: '4px',
+                        left: isOn ? '24px' : '4px',
                         top: '4px',
                         width: '16px',
                         height: '16px',
                         background: 'white',
                         borderRadius: '50%',
+                        transition: 'left 0.2s',
+                        display: 'block',
                       }} />
-                    </span>
-                  </label>
-                </div>
-              ))}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
             <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
-              <button className="btn btn-primary">💾 Ruaj Preferencat</button>
+              <button className="btn btn-primary" onClick={saveNotifPrefs}>💾 Ruaj Preferencat</button>
             </div>
           </div>
         )}
