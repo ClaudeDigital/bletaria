@@ -1,3 +1,4 @@
+import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { adminAuthAPI, adminDataAPI } from '../api'
 
@@ -76,7 +77,7 @@ function StatsTab() {
       }))
   }, [])
 
-  if (!stats) return <div className="loading-center"><div className="spinner" /></div>
+  if (!stats) return <PageLoader />
 
   const cards = [
     { icon: '👥', label: 'Perdorues', value: stats.users, sub: `${stats.active_users} aktiv` },

@@ -1,3 +1,4 @@
+import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { hiveAPI } from '../api'
@@ -229,7 +230,7 @@ export default function HivePage() {
     }
   }
 
-  if (loading) return <div className="loading-center"><div className="spinner" /></div>
+  if (loading) return <PageLoader />
   if (error) return <div className="page-content"><div className="container"><div className="alert alert-error">{error}</div></div></div>
 
   const st = STATUS_CONFIG[hive?.status] || STATUS_CONFIG.empty

@@ -1,3 +1,4 @@
+import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { marketplaceAPI } from '../api'
 import { useAuth } from '../context/AuthContext'
@@ -430,7 +431,7 @@ export default function MarketplacePage() {
         </div>
 
         {loading ? (
-          <div className="loading-center"><div className="spinner" /></div>
+          <PageLoader />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-icon">🛒</div>

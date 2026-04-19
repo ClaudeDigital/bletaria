@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
+import PageLoader from './components/PageLoader'
 
 // Pages
 import HomePage from './pages/HomePage'
@@ -22,12 +23,7 @@ import AdminPage from './pages/AdminPage'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
-  if (loading) return (
-    <div className="loading-center">
-      <div className="spinner" />
-      <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Duke ngarkuar...</span>
-    </div>
-  )
+  if (loading) return <PageLoader />
   return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 

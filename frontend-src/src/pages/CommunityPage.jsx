@@ -1,3 +1,4 @@
+import PageLoader from '../components/PageLoader'
 import { useState, useEffect, useRef } from 'react'
 import { communityAPI } from '../api'
 import { useAuth } from '../context/AuthContext'
@@ -363,7 +364,7 @@ export default function CommunityPage() {
         </div>
 
         {loading && page === 1 ? (
-          <div className="loading-center"><div className="spinner" /></div>
+          <PageLoader />
         ) : (
           <div>
             {posts.map(post => (

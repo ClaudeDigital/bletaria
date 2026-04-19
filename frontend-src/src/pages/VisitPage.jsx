@@ -1,3 +1,4 @@
+import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { apiaryAPI, hiveAPI, visitAPI } from '../api'
@@ -99,7 +100,7 @@ export default function VisitPage() {
     }
   }
 
-  if (loading) return <div className="loading-center"><div className="spinner" /></div>
+  if (loading) return <PageLoader />
 
   return (
     <div className="page-content">

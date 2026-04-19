@@ -1918,37 +1918,58 @@ app.use((err, req, res, next) => {
 // ─── Seed sample data ─────────────────────────────────────────────────────────
 
 function seedSampleData() {
-  // Only seed if there's a user and not enough posts/listings
-  const users = db.prepare('SELECT id, first_name, last_name FROM users LIMIT 1').all();
-  if (!users.length) return;
-  const uid = users[0].id;
+  const expires = new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString();
 
+  // Create sample Albanian users if not already present (identified by sample email domain)
+  const sampleUsers = [
+    { first: 'Agim',      last: 'Berisha',   email: 'agim.berisha@bletaria.sample',   pass: 'Sample2025!' },
+    { first: 'Flutura',   last: 'Krasniqi',  email: 'flutura.krasniqi@bletaria.sample', pass: 'Sample2025!' },
+    { first: 'Besnik',    last: 'Hoxha',     email: 'besnik.hoxha@bletaria.sample',   pass: 'Sample2025!' },
+    { first: 'Valentina', last: 'Doci',      email: 'valentina.doci@bletaria.sample', pass: 'Sample2025!' },
+    { first: 'Rexhep',    last: 'Gashi',     email: 'rexhep.gashi@bletaria.sample',   pass: 'Sample2025!' },
+    { first: 'Zana',      last: 'Murati',    email: 'zana.murati@bletaria.sample',    pass: 'Sample2025!' },
+  ];
+
+  const getUserId = (email) => {
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existing) return existing.id;
+    const hash = bcrypt.hashSync('Sample2025!', 8);
+    const u = sampleUsers.find(u => u.email === email);
+    const res = db.prepare(
+      'INSERT INTO users (first_name, last_name, email, password_hash, active) VALUES (?, ?, ?, ?, 1)'
+    ).run(u.first, u.last, u.email, hash);
+    return res.lastInsertRowid;
+  };
+
+  // Seed community posts
   const postCount = db.prepare('SELECT COUNT(*) as c FROM community_posts').get().c;
-  if (postCount < 3) {
-    const samplePosts = [
-      'Sot bëra vizitën e parë të pranverës! 15 nga 18 koshere me mbretëreshë aktive. Sezoni po fillon shumë mirë! 🐝🍯',
-      'Pyetje për komunitetin: kur filloni trajtimin e Varroas këtë vit? Unë planifikoj pas blerjes së mjaltës së parë, rreth gusht-shtator.',
-      'Korrën e parë të mjaltit: 40 kg nga 8 koshere! Luleshtrydhe dhe limon — aroma e jashtëzakonshme. Viti 2026 po fillon mirë! 🍯',
-      'Mbretëresha e njërës koshëre nuk gjendet — shenjat tregojnë orfaniteti. A ka ndonjë sugjerim se si ta zgjidhë situatën shpejt?',
-      'Ndava bletarinë nga 8 koshere në 12 duke bërë ndarje artificiale. Procedura shkoi mirë — koshevet e reja po reagojnë mirë! 💪',
+  if (postCount < 4) {
+    const posts = [
+      { email: 'agim.berisha@bletaria.sample',   content: 'Sot bëra vizitën e parë të pranverës! 🌸 15 nga 18 koshere me mbretëreshë aktive. Sezoni po fillon shumë mirë!' },
+      { email: 'flutura.krasniqi@bletaria.sample', content: 'Pyetje: kur filloni trajtimin e Varroas këtë vit? Unë planifikoj pas blerjes së mjaltës, rreth gusht-shtator.' },
+      { email: 'besnik.hoxha@bletaria.sample',   content: '🍯 Korrën e parë të mjaltit: 40 kg nga 8 koshere! Luleshtrydhe dhe limon — aroma e jashtëzakonshme. Viti 2026 nisi mirë!' },
+      { email: 'valentina.doci@bletaria.sample', content: 'Mbretëresha e njërës koshëre nuk gjendet — shenjat tregojnë orfaniteti. Keni ndonjë sugjerim si ta zgjidhim shpejt?' },
+      { email: 'rexhep.gashi@bletaria.sample',   content: 'Ndava bletarinë nga 8 në 12 koshere me ndarje artificiale. Procedura shkoi mirë — kosherët e reja po reagojnë shkëlqyer! 💪' },
     ];
-    for (const content of samplePosts.slice(postCount)) {
-      db.prepare('INSERT INTO community_posts (user_id, content) VALUES (?, ?)').run(uid, content);
+    for (const p of posts.slice(postCount)) {
+      const uid = getUserId(p.email);
+      db.prepare('INSERT INTO community_posts (user_id, content) VALUES (?, ?)').run(uid, p.content);
     }
   }
 
+  // Seed marketplace listings
   const listCount = db.prepare("SELECT COUNT(*) as c FROM marketplace_listings WHERE expires_at > datetime('now')").get().c;
-  if (listCount < 3) {
-    const expires = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
-    const sampleListings = [
-      { title: 'Mjaltë Luleshtrydhe Organik 500g', price: 8.5, category: 'mjaltë', desc: 'Mjaltë i pastër organik nga lisat e kodrave. Kavanoz qelqi 500g. I çertifikuar BIO.', contact: '+383 44 123 456' },
-      { title: 'Koshëre Langstroth 10 Korniza', price: 45, category: 'koshere', desc: 'Koshëre e re, e papërdorur. Dru pishe e trajtuar. Kompletë me korniza dhe nënshkronjë.', contact: '+355 69 234 567' },
-      { title: 'Api-Life Var — Trajtim Varroa', price: 12, category: 'ilaçe', desc: 'Api-Life Var 100g, 2 copë. Produkt organik me timol dhe kamfor kundër Varroa destructor.', contact: '+383 45 345 678' },
-      { title: 'Mbretëresha Carniolan e Re', price: 18, category: 'mbretëresha', desc: 'Mbretëresha e re rraca Carniolan, e mbushur dhe e testuar. Shumë e qetë dhe produktive.', contact: '+355 67 456 789' },
-      { title: 'Qumësht Bletësh (Royal Jelly) 50g', price: 35, category: 'qumësht bletësh', desc: 'Royal jelly i freskët, i ngrirë menjëherë pas vjeljes. I pastër, pa konservantë.', contact: '+383 44 567 890' },
-      { title: 'Ekstraktor Mjalti 3 Kat — Çelik Inox', price: 280, category: 'pajisje', desc: 'Ekstraktor manual prej çeliku inox, 3 katesh. Kapacitet 30kg mjaltë. Gjendje shumë e mirë.', contact: '+355 68 678 901' },
+  if (listCount < 4) {
+    const listings = [
+      { email: 'agim.berisha@bletaria.sample',   title: 'Mjaltë Luleshtrydhe Organik 500g', price: 8.5,  category: 'mjaltë',           desc: 'Mjaltë i pastër organik nga lisat e kodrave të Alpeve Shqiptare. Kavanoz qelqi 500g. I çertifikuar BIO.', contact: '+383 44 112 233' },
+      { email: 'besnik.hoxha@bletaria.sample',   title: 'Koshëre Langstroth 10 Korniza',    price: 45,   category: 'koshere',           desc: 'Koshëre e re, e papërdorur. Dru pishe e trajtuar. Kompletë me korniza, nënshkronjë dhe kapak.', contact: '+355 69 223 344' },
+      { email: 'flutura.krasniqi@bletaria.sample', title: 'Api-Life Var — Trajtim Varroa',  price: 12,   category: 'ilaçe',             desc: 'Api-Life Var 100g, 2 copë. Produkt organik me timol dhe kamfor kundër Varroa destructor.', contact: '+383 45 334 455' },
+      { email: 'valentina.doci@bletaria.sample', title: 'Mbretëresha Carniolan e Re 2026',  price: 18,   category: 'mbretëresha',       desc: 'Mbretëresha e re rraca Carniolan, e mbushur dhe e testuar. Shumë e qetë dhe prodhimtare.', contact: '+355 67 445 566' },
+      { email: 'rexhep.gashi@bletaria.sample',   title: 'Qumësht Bletësh (Royal Jelly) 50g', price: 35, category: 'qumësht bletësh',   desc: 'Royal jelly i freskët, i ngrirë menjëherë pas vjeljes. Pa konservantë, cilësi e lartë.', contact: '+383 44 556 677' },
+      { email: 'zana.murati@bletaria.sample',    title: 'Ekstraktor Mjalti 3 Kat Inox',    price: 275,  category: 'pajisje',           desc: 'Ekstraktor manual çelik inox, 3 katesh, kapacitet 30kg. Gjendje shumë e mirë, pak i përdorur.', contact: '+355 68 667 788' },
     ];
-    for (const l of sampleListings.slice(listCount)) {
+    for (const l of listings.slice(listCount)) {
+      const uid = getUserId(l.email);
       db.prepare('INSERT INTO marketplace_listings (user_id, title, description, price, category, contact, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(uid, l.title, l.desc, l.price, l.category, l.contact, expires);
     }
   }

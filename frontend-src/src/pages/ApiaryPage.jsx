@@ -1,3 +1,4 @@
+import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { apiaryAPI, hiveAPI } from '../api'
@@ -246,7 +247,7 @@ export default function ApiaryPage() {
   }, {})
 
   if (loading) return (
-    <div className="loading-center"><div className="spinner" /></div>
+    <PageLoader />
   )
 
   if (error) return (
