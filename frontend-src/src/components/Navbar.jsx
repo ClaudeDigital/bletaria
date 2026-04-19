@@ -23,7 +23,7 @@ export default function Navbar() {
   const publicLinks = [
     { to: '/', label: '🏠 Ballina' },
     { to: '/community', label: 'Komuniteti' },
-    { to: '/marketplace', label: 'Marketplace' },
+    { to: '/marketplace', label: 'Tregu' },
   ]
 
   const privateLinks = [

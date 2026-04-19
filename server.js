@@ -1102,52 +1102,243 @@ function callClaudeAPI(prompt) {
 }
 
 function getMockRecommendation(prompt) {
-  const lowerPrompt = (prompt || '').toLowerCase();
-  if (lowerPrompt.includes('varroa') || lowerPrompt.includes('parazit')) {
-    return `Këshilla për luftimin e Varroa destructor:
+  const p = (prompt || '').toLowerCase();
 
-1. **Monitorimi i rregullt**: Kontrolloni numrin e acarëve çdo muaj duke përdorur metodën e rrëshqitjes alkoolike. Mbi 3 acarë/100 blete tregon nevojën për trajtim.
+  if (p.includes('varroa') || p.includes('parazit') || p.includes('acar')) {
+    return `**Luftimi i Varroa destructor**
 
-2. **Trajtimi me acid oksalik**: Metoda më efektive gjatë dimrit kur kolonia është pa pjellë. Zbatoni 3-5% tretësirë me pikon ose avullim.
+1. **Monitorimi i rregullt**: Metoda e rrëshqitjes alkoolike çdo muaj — mbi 3 acarë/100 bletë kërkon trajtim urgjent.
 
-3. **Heqja e pjellës së dronëve**: Teknikë biologjike - shtoni kornizë "kurth" dhe hiqni pjellën e mbyllur të dronëve çdo 9-10 ditë.
+2. **Acid oksalik**: Metoda më efektive gjatë dimrit kur kolonia është pa pjellë. Avullim ose pikë 3-5% tretësirë.
 
-4. **Rrotullimi i barnave**: Shmangni rezistencën duke alternuar midis acidi oksalik, acid formik dhe timolik.
+3. **Acid formik (MAQS)**: Efektiv edhe nën pjellën e mbyllur — vendoset mbi kornizat për 7 ditë.
 
-5. **Koha optimale**: Trajtimi duhet bërë nga shtatori deri në nëntor dhe gjatë periudhave pa pjellë.
+4. **Heqja e pjellës së dronëve**: Çdo 9-10 ditë hiqni kornizën "kurth" me pjellën e mbyllur të dronëve.
 
-Konsultohuni gjithmonë me veterinerin vendor para çdo trajtimi kimik.`;
+5. **Timol (ApiLife Var)**: Trajtim organik veror — efektiv mbi 15°C, 3-4 javë.
+
+6. **Rrotullimi**: Alternoni barnat çdo sezon për të shmangur rezistencën.
+
+⚠️ Trajtoni gjithmonë pas blerjes së mjaltit, kurrë gjatë sezonit aktiv të prodhimit.`;
   }
-  if (lowerPrompt.includes('mbretëreshë') || lowerPrompt.includes('mbretereshe')) {
-    return `Këshilla mbi menaxhimin e mbretëreshës:
 
-1. **Identifikimi**: Mbretëresha është më e gjatë se bletët punëtore, me bark të zgjatur. Shpesh shënohet me bojë sipas vitit të lindjes.
+  if (p.includes('mbretëreshë') || p.includes('mbretereshe') || p.includes('mbreteresha') || p.includes('queen')) {
+    return `**Menaxhimi i Mbretëreshës**
 
-2. **Kontrolli i moshës**: Mbretëresha prodhon feromon maksimal deri në 2 vjeç. Pas kësaj kohe efektiviteti zvogëlohet dhe kolonia mund të bjerë.
+1. **Identifikimi**: Mbretëresha ka bark të zgjatur, lëvizje të ngadalta dhe bletët formojnë rreth saj. Shënohet me bojë sipas vitit (2025=e bardhë, 2026=e verdhë).
 
-3. **Ndërrimi natyral**: Bletët shpesh bëjnë ndërrimin natyral të mbretëreshës (supersedure). Kjo zakonisht ndodh pa roj.
+2. **Mosha optimale**: Zëvendëso çdo 1-2 vjet — feromon dhe pjelloría ulen pas vitit të dytë.
 
-4. **Ndërrimi artificial**: Planifikojeni gjatë sezonit kur dronët janë të pranishëm (prill-gusht). Vendosni mbretëreshë të re nga raca e mirë.
+3. **Shenjat e problemeve**:
+   - Pjellë e shpërndarë (mungesë vezësh)
+   - Qeliza bosh midis pjellës
+   - Bletë punëtore me vezë (orfaniteti)
 
-5. **Shenjat e mbretëreshës pa pllenë**: Pjellë e shpërndarë, qeliza te varrosura çrregullisht, bletë punëtore me vezë (sinjal rëndues).
+4. **Ndërrimi natyral (supersedure)**: Bletët ndërtojnë qelizë mbretëreshe mbi kornizën aktive — mos ndërhyj.
 
-Rekomandohet të ndërroni mbretëreshën çdo 1-2 vjet për prodhimtari maksimale.`;
+5. **Ndërrimi artificial**: Bëje prill-gusht kur dronët janë prezent. Largo mbretëreshën e vjetër 24 orë para futjes së re.
+
+6. **Futja e mbretëreshës**: Metoda e konfeksionit (kandisë) — vendos kafazin 2-3 ditë derisa bletët ta çlirojnë vetë.`;
   }
-  return `Këshilla të përgjithshme për bletari:
 
-1. **Vizitat e rregullta**: Inspektoni kosherët çdo 7-10 ditë gjatë sezonit aktiv. Shënoni çdo ndryshim që vërejtni.
+  if (p.includes('mjaltë') || p.includes('mjalt') || p.includes('prodhim') || p.includes('harvest') || p.includes('vendos')) {
+    return `**Prodhimi dhe Vjelja e Mjaltit**
 
-2. **Ushqyerja**: Plotësoni rezervat e mjaltit dhe polenës gjatë periudhave të mungesës. Përdorni sheqer 1:1 (ujë:sheqer) si ushqim emergjent.
+1. **Koha e duhur**: Blerto mjaltën kur kornizat janë të mbushura 80-90% dhe të mbyllura me kapak dylli.
 
-3. **Higjiena**: Mbani pajisjet të pastra dhe dezinfektuara. Zëvendësoni kornizat e vjetra (mbi 3-4 vjet) rregullisht.
+2. **Testi i pjekurisë**: Ktheje kornizën horizontalisht — nëse mjalti nuk rrjedh, është pjekur (lagështia <20%).
 
-4. **Mbrojtja nga pemishtja**: Poziciononi bletarinë larg pesticideve dhe afër burimeve ujore të pastra.
+3. **Ekstraktimi**: Pastroni ekstraktorin me ujë të nxehtë. Rrotulloni kornizat ngadalë fillimisht.
 
-5. **Shënimet**: Mbani ditar të detajuar për çdo koshëre - mbretëresha, forca e kolonisë, prodhimtaria, trajtimet.
+4. **Filtrimi**: Filtro me filtër 400-600 mikron për të hequr dylli dhe mbetjet.
 
-6. **Dimërim i mirë**: Sigurohuni që çdo koshëre hyn në dimër me të paktën 15-18 kg ushqim dhe popullsi të mjaftueshme.
+5. **Kristalizimi**: Normal dhe i shëndetshëm — ngrohja e butë (max 40°C) e shpërndan sërish.
 
-A keni pyetje specifike rreth bletarisë suaj?`;
+6. **Sasia mesatare**: Koshëre e fortë prodhon 20-40 kg/vit në klimë të favorshme. Lini gjithmonë 10-15 kg për dimër.
+
+7. **Etiketimi**: Shënoni datën, lulen mbizotëruese dhe peshën. Ruajeni në vend të errët dhe të freskët.`;
+  }
+
+  if (p.includes('ushqim') || p.includes('ushqye') || p.includes('sheqer') || p.includes('sirop') || p.includes('kek')) {
+    return `**Ushqimi i Bletëve**
+
+1. **Sirop sheqeri (1:1)**: Ujë:sheqer barazi — për stimulim pranveror dhe plotësim rezervash. Jepni 0.5-1L çdo 3 ditë.
+
+2. **Sirop i trashë (2:1)**: Dy pjesë sheqer : një ujë — për dimërim. Konsumohet ngadalë.
+
+3. **Kek kandis (fondantë)**: Ideal për dimër — vendoset mbi kornizat. Bletët e konsumojnë ngadalë sipas nevojës.
+
+4. **Polen zëvendësues**: Tortë proteinike (polleni artificial) stimulon rritjen kolonisë në pranverë.
+
+5. **Koha e ushqimit**: Gjithmonë mbrëmjet — shmang grabitjen nga kolonitë fqinje.
+
+6. **Sasi**: Koloni e mesme nevojitet 15-18 kg ushqim për dimërim të sigurt.
+
+⚠️ Mos ushqeni me mjaltë nga burime të panjohura — rrezik nga sëmundja AFB.`;
+  }
+
+  if (p.includes('sëmundj') || p.includes('semundj') || p.includes('nosema') || p.includes('afb') || p.includes('efb') || p.includes('kalbëzim') || p.includes('kalbezim')) {
+    return `**Sëmundjet Kryesore të Bletëve**
+
+🦠 **Nosema** (Nosema apis/ceranae):
+- Simptoma: diarre, bletë me bark të fryrë, ngordhje e hershme dimërore
+- Trajtimi: Fumidil-B (nuk lejohet në BE) ose menaxhim i higjienës. Zëvendësimi i mjaltit me sirop të pastër.
+
+🔴 **AFB (Kalbëzimi Amerikan)**:
+- Simptoma: pjellë kafe, erë e keqe, nit testi (filli i tejzgjatur)
+- **Lajmëro menjëherë autoritetin veterinar — sëmundje e detyrueshme për njoftim!**
+- Djegja e koshereve të infektuar është e detyrueshme.
+
+🟡 **EFB (Kalbëzimi Europian)**:
+- Simptoma: larvë e verdhë-kafe jashtë pozicionit normal
+- Trajtimi: oksitetraciklin + ndërrim mbretëreshe + forcim kolonie
+
+🔵 **Sacbrood**:
+- Larvë e vdekur si qeskë me lëng
+- Nuk ka trajtim kimik — zëvendësoni mbretëreshën dhe forconi koloninë`;
+  }
+
+  if (p.includes('dimër') || p.includes('dimer') || p.includes('dimërim') || p.includes('dimëro') || p.includes('tetor') || p.includes('nëntor') || p.includes('dhjetor') || p.includes('janar') || p.includes('shkurt')) {
+    return `**Dimërimi i Bletëve**
+
+1. **Koha e përgatitjes**: Shtator-tetor — kontrollo rezervat dhe krijo grupe dimëruese.
+
+2. **Rezervat minimale**: 15-18 kg ushqim (mjaltë+sirop 2:1) për çdo koloni.
+
+3. **Forca e kolonisë**: Minimumi 5-6 korniza bletë të mbuluara. Kolo. e dobëta bashkoi!
+
+4. **Trajtimi i Varroas**: Kryesore pas blerjes së mjaltit (gusht-shtator). Acid oksalik në dhjetor kur s'ka pjellë.
+
+5. **Ventilimi**: Mos mbyllo plotësisht hyrjen — lagështia vret bletët, jo të ftohti!
+
+6. **Mbrojtja**: Mbulesë nga reshjet dhe era. Mbaj hyrjen të hapur 5-8mm kundër migjeve.
+
+7. **Kontrolli**: Mos hap koshëren nën 14°C. Koplejo vetëm duke ndëgjuar tingujt (zhurmë e rregullt = OK).
+
+8. **Pranvera**: Kontroll i parë kur temperaturat arrijnë 12-14°C ditën.`;
+  }
+
+  if (p.includes('pranver') || p.includes('fillim') || p.includes('mars') || p.includes('prill') || p.includes('vizit') || p.includes('kontroll')) {
+    return `**Menaxhimi i Pranverës dhe Vizitat**
+
+🌸 **Vizita e parë (Mars-Prill)**:
+- Bëje mbi 12°C — kontrollo prezencën e mbretëreshës dhe vezëve
+- Hiq kornizat e vjetra, të kalbëzuara ose bosh
+- Shto kek kandis nëse rezervat janë të ulëta
+
+📋 **Çfarë të kontrollosh çdo vizitë**:
+1. Mbretëresha — prezencë dhe pjellë e rregullt
+2. Rezervat e ushqimit
+3. Shenjat e Varroas (bletë me krahë të deformuar)
+4. Hapësira e disponueshme (shto etazhe nëse nevojitet)
+5. Qeliza mbretëreshe — sinjal i rojeve ose zëvendësimit
+
+⏱️ **Frekuenca**: Çdo 7-10 ditë gjatë sezonit; çdo 14 ditë jashtë sezonit.
+
+📝 **Shënimet**: Dëfto çdo vizitë me datë, forcën e kolonisë, mbretëreshën, ushqimin.`;
+  }
+
+  if (p.includes('koshër') || p.includes('kosher') || p.includes('langstroth') || p.includes('dadan') || p.includes('etazh') || p.includes('korniz')) {
+    return `**Koshëret dhe Pajisjet**
+
+🏠 **Llojet kryesore**:
+- **Langstroth**: Standardi ndërkombëtar — 10 korniza, lehtë për menaxhim
+- **Dadant-Blatt**: Kornizë më e madhe — për kolonitë e forta
+- **Warre (vertikale)**: Natyrale, minimal ndërhyrje
+- **Zaun/Log (tradicionale)**: Vështirë për menaxhim, por e natyrshme
+
+📐 **Kur të shtoni etazhe**:
+- Kur 7-8 korniza janë të mbushura
+- Gjatë sezonit aktiv të nektarit
+- Shtojeni etazhin nën etazhin ekzistues (Nadir) ose mbi (Super)
+
+🔧 **Mirëmbajtja**:
+- Ngjyrosni me bojë të bardhë ose të hapur jashtë (UV + lagështi)
+- Pastroni me zjarr ose flakë çdo vit
+- Zëvendësoni kornizat e vjetra mbi 3-4 vjet`;
+  }
+
+  if (p.includes('qumësht') || p.includes('qumesht') || p.includes('royal jelly') || p.includes('gelatin') || p.includes('laktë')) {
+    return `**Qumështi i Bletës (Royal Jelly)**
+
+🍶 **Çfarë është**:
+Royal jelly (qumështi i mbretëreshës) prodhon nga bletët punëtore mosha 5-15 ditë. Përmban proteina, vitamina B, acid 10-HDA dhe substanca unike.
+
+🏭 **Prodhimi**:
+1. Nevojiten koloni të forta (12+ korniza) dhe mbretëreshë aktive
+2. Metoda "grafting" — transferimi i larvave 12-18 orë nga qelizat punëtore
+3. Vjelja bëhet çdo 72 orë (maksimum prodhim)
+4. Ruhet menjëherë në -18°C ose me mjaltë (1:1)
+
+📊 **Sasi**: 300-500g/vit për koloni të trajnuar mirë.
+
+⚕️ **Vlerat shëndetësore**: Antioksidant, antibakterial, stimulim imunitar. Konsulto mjekun para përdorimit terapeutik.
+
+💰 **Tregu**: 50-150 €/100g — produkt me vlerë të lartë tregtar.`;
+  }
+
+  if (p.includes('polino') || p.includes('polenim') || p.includes('pemë') || p.includes('lule') || p.includes('bimë')) {
+    return `**Polenizimi dhe Roli i Bletëve**
+
+🌸 **Rëndësia**:
+80% e bimëve me lule varen nga polenizimi i bletëve — mollë, qershi, luledielli, tërfili, kastravec, etj.
+
+📍 **Vendosja e bletarisë**:
+- 1-2 km nga burimet kryesore të nektarit/polenit
+- Evitoni zonat me pesticide
+- Pranë ujit të pastër (max 300m)
+- Jo nën rrezet direkte të diellit të mesditës (orientim JL-Jug)
+
+🚜 **Polenizim i kontraktuar**:
+- Fermerët paguajnë për koshere gjatë lulëzimit
+- 1-2 koshere/hektar për pemë frutore
+- Çmimi: 30-80 €/koshëre/sezon (varion nga rajoni)
+
+🌻 **Kultura më tërheqëse**:
+Lule dielli, lulendar, gëzof trëndafili, bari i mjaltit (Phacelia), tërfili i kuq, gëlqerja (lipa).`;
+  }
+
+  if (p.includes('hell') || p.includes('thumbim') || p.includes('pickim') || p.includes('alergi') || p.includes('mbrojtj') || p.includes('kostum') || p.includes('tymis')) {
+    return `**Mbrojtja dhe Siguria**
+
+🛡️ **Pajisjet e mbrojtjes**:
+- Kombinezon i plotë ose xhaketë me kapelë — material i dendur, ngjyrë e hapur
+- Doreza lëkuri ose gome — kompromis midis mbrojtjes dhe ndjenjës
+- Çizme të larta ose tape rreth kyçeve
+
+🔥 **Tymisi (tymuesi)**:
+- Materialit: kore lisi, kumbull e thatë, karton i vjetër, shkopinj pambuku
+- Tymos buzët e koshëres dhe sipër kornizave para hapjes
+- Tymi imituon zjarrin — bletët konsumojnë mjaltë dhe bëhen më të qeta
+
+⏰ **Koha optimale e vizitës**:
+- Midisditë (10:00-14:00) kur bletët mbledhëse janë jashtë
+- Ditë me diell dhe pa erë
+- Evito mëngjeset, mbrëmjet, para stuhisë dhe pas vjedhjes
+
+🏥 **Nëse pickon**:
+- Hiq heshtazën me skraper (mos shtrydh me gishta)
+- Ftoh me akull 10-15 min
+- Antihistaminik oral nëse nevojitet
+- ⚠️ Anafilaksia — kërkon epinefrinë dhe urgjencë mjekësore`;
+  }
+
+  // Generic but structured response with many topics
+  return `**Asistenti i Bletarisë — Këshilla Gjenerale**
+
+Pyetja juaj mund të lidhet me një nga temat e mëposhtme. Pyeteni më specifikisht:
+
+🦠 **Sëmundje & Parazitë**: "Si trajtoj Varroan?", "Çfarë është Nosema?"
+👑 **Mbretëresha**: "Kur ndërroj mbretëreshën?", "Si e identifikoj?"
+🍯 **Prodhimi i mjaltit**: "Kur bleroj mjaltin?", "Si ekstraktoj?"
+🌸 **Pranvera**: "Çfarë bëj në pranverë?", "Vizita e parë"
+❄️ **Dimërimi**: "Si i dimëroj bletët?", "Sa ushqim duhet?"
+🍶 **Qumësht blete**: "Si prodhoj royal jelly?"
+🌿 **Ushqimi**: "Kur ushqej bletët?", "Çfarë sirop të bëj?"
+🏠 **Koshëret**: "Cila koshëre është më e mirë?", "Kur shtoj etazh?"
+🛡️ **Mbrojtja**: "Si të mos pickohesh?", "Si përdor tymisin?"
+
+Shkruani pyetjen tuaj specifike dhe do të merrni këshilla të detajuara! 🐝`;
 }
 
 // POST /api/ai/recommend
@@ -1642,12 +1833,13 @@ app.get('/api/marketplace/:id', (req, res) => {
   res.json({ id: l.id, title: l.title, price: l.price, category: l.category, description: l.description, contact_phone: l.contact, image: l.image_url, date: l.created_at, seller: { name: `${l.first_name} ${l.last_name}`.trim() } });
 });
 app.post('/api/marketplace', authMiddleware, upload.single('image'), (req, res) => {
-  const { title, description, price, category, contact } = req.body;
+  const { title, description, price, category, contact, contact_phone } = req.body;
   if (!title) return res.status(400).json({ error: 'Titulli kërkohet' });
   const image_url = req.file ? `/uploads/${req.file.filename}` : null;
   const expiry_days = (() => { try { return db.prepare("SELECT value FROM app_settings WHERE key = 'listing_expiry_days'").get()?.value || 30; } catch { return 30; } })();
   const expires_at = new Date(Date.now() + expiry_days * 24 * 3600 * 1000).toISOString();
-  const result = db.prepare('INSERT INTO marketplace_listings (user_id, title, description, price, category, image_url, contact, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(req.user.id, title.trim(), description || null, price ? parseFloat(price) : null, category || null, image_url, contact || null, expires_at);
+  const contactVal = contact_phone || contact || null;
+  const result = db.prepare('INSERT INTO marketplace_listings (user_id, title, description, price, category, image_url, contact, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(req.user.id, title.trim(), description || null, price ? parseFloat(price) : null, category || null, image_url, contactVal, expires_at);
   res.status(201).json(db.prepare('SELECT * FROM marketplace_listings WHERE id = ?').get(result.lastInsertRowid));
 });
 app.put('/api/marketplace/:id', authMiddleware, (req, res) => {
@@ -1723,6 +1915,45 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Gabim i brendshëm i serverit' });
 });
 
+// ─── Seed sample data ─────────────────────────────────────────────────────────
+
+function seedSampleData() {
+  // Only seed if there's a user and not enough posts/listings
+  const users = db.prepare('SELECT id, first_name, last_name FROM users LIMIT 1').all();
+  if (!users.length) return;
+  const uid = users[0].id;
+
+  const postCount = db.prepare('SELECT COUNT(*) as c FROM community_posts').get().c;
+  if (postCount < 3) {
+    const samplePosts = [
+      'Sot bëra vizitën e parë të pranverës! 15 nga 18 koshere me mbretëreshë aktive. Sezoni po fillon shumë mirë! 🐝🍯',
+      'Pyetje për komunitetin: kur filloni trajtimin e Varroas këtë vit? Unë planifikoj pas blerjes së mjaltës së parë, rreth gusht-shtator.',
+      'Korrën e parë të mjaltit: 40 kg nga 8 koshere! Luleshtrydhe dhe limon — aroma e jashtëzakonshme. Viti 2026 po fillon mirë! 🍯',
+      'Mbretëresha e njërës koshëre nuk gjendet — shenjat tregojnë orfaniteti. A ka ndonjë sugjerim se si ta zgjidhë situatën shpejt?',
+      'Ndava bletarinë nga 8 koshere në 12 duke bërë ndarje artificiale. Procedura shkoi mirë — koshevet e reja po reagojnë mirë! 💪',
+    ];
+    for (const content of samplePosts.slice(postCount)) {
+      db.prepare('INSERT INTO community_posts (user_id, content) VALUES (?, ?)').run(uid, content);
+    }
+  }
+
+  const listCount = db.prepare("SELECT COUNT(*) as c FROM marketplace_listings WHERE expires_at > datetime('now')").get().c;
+  if (listCount < 3) {
+    const expires = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+    const sampleListings = [
+      { title: 'Mjaltë Luleshtrydhe Organik 500g', price: 8.5, category: 'mjaltë', desc: 'Mjaltë i pastër organik nga lisat e kodrave. Kavanoz qelqi 500g. I çertifikuar BIO.', contact: '+383 44 123 456' },
+      { title: 'Koshëre Langstroth 10 Korniza', price: 45, category: 'koshere', desc: 'Koshëre e re, e papërdorur. Dru pishe e trajtuar. Kompletë me korniza dhe nënshkronjë.', contact: '+355 69 234 567' },
+      { title: 'Api-Life Var — Trajtim Varroa', price: 12, category: 'ilaçe', desc: 'Api-Life Var 100g, 2 copë. Produkt organik me timol dhe kamfor kundër Varroa destructor.', contact: '+383 45 345 678' },
+      { title: 'Mbretëresha Carniolan e Re', price: 18, category: 'mbretëresha', desc: 'Mbretëresha e re rraca Carniolan, e mbushur dhe e testuar. Shumë e qetë dhe produktive.', contact: '+355 67 456 789' },
+      { title: 'Qumësht Bletësh (Royal Jelly) 50g', price: 35, category: 'qumësht bletësh', desc: 'Royal jelly i freskët, i ngrirë menjëherë pas vjeljes. I pastër, pa konservantë.', contact: '+383 44 567 890' },
+      { title: 'Ekstraktor Mjalti 3 Kat — Çelik Inox', price: 280, category: 'pajisje', desc: 'Ekstraktor manual prej çeliku inox, 3 katesh. Kapacitet 30kg mjaltë. Gjendje shumë e mirë.', contact: '+355 68 678 901' },
+    ];
+    for (const l of sampleListings.slice(listCount)) {
+      db.prepare('INSERT INTO marketplace_listings (user_id, title, description, price, category, contact, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(uid, l.title, l.desc, l.price, l.category, l.contact, expires);
+    }
+  }
+}
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
@@ -1730,4 +1961,5 @@ app.listen(PORT, () => {
   console.log(`Database: ${DB_PATH}`);
   console.log(`Uploads: ${UPLOADS_DIR}`);
   console.log(`Claude AI: ${CLAUDE_API_KEY ? 'Enabled' : 'Mock mode'}`);
+  try { seedSampleData(); } catch (e) { console.log('Seed skipped:', e.message); }
 });

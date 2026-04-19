@@ -5,10 +5,11 @@ import { useAuth } from '../context/AuthContext'
 const CATEGORIES = [
   { value: '', label: '🏷 Të gjitha' },
   { value: 'mjaltë', label: '🍯 Mjaltë' },
+  { value: 'qumësht bletësh', label: '🍶 Qumësht Bletësh' },
   { value: 'koshere', label: '🏠 Koshere' },
   { value: 'pajisje', label: '🔧 Pajisje' },
   { value: 'ilaçe', label: '💊 Ilaçe' },
-  { value: 'nënmbretëresha', label: '👑 Nënmbretëresha' },
+  { value: 'mbretëresha', label: '👑 Mbretëresha' },
   { value: 'tjera', label: '📦 Tjera' },
 ]
 
@@ -77,9 +78,11 @@ const SAMPLE_LISTINGS = [
 
 const CATEGORY_ICONS = {
   'mjaltë': '🍯',
+  'qumësht bletësh': '🍶',
   'koshere': '🏠',
   'pajisje': '🔧',
   'ilaçe': '💊',
+  'mbretëresha': '👑',
   'nënmbretëresha': '👑',
   'tjera': '📦',
 }
@@ -169,8 +172,7 @@ function AddListingModal({ onClose, onAdded }) {
     price: '',
     category: 'mjaltë',
     description: '',
-    contact_phone: '',
-    contact_email: '',
+    contact: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -182,20 +184,18 @@ function AddListingModal({ onClose, onAdded }) {
     try {
       const res = await marketplaceAPI.create(form)
       onAdded(res.data.listing || {
-        id: Date.now(),
-        ...form,
-        price: parseFloat(form.price),
-        seller: { name: user?.name, location: user?.location },
-        date: new Date().toISOString().slice(0, 10),
+        id: Date.now(), title: form.title, price: parseFloat(form.price),
+        category: form.category, description: form.description,
+        contact_phone: form.contact,
+        seller: { name: user?.name }, date: new Date().toISOString().slice(0, 10),
       })
       onClose()
     } catch {
       onAdded({
-        id: Date.now(),
-        ...form,
-        price: parseFloat(form.price),
-        seller: { name: user?.name, location: user?.location },
-        date: new Date().toISOString().slice(0, 10),
+        id: Date.now(), title: form.title, price: parseFloat(form.price),
+        category: form.category, description: form.description,
+        contact_phone: form.contact,
+        seller: { name: user?.name }, date: new Date().toISOString().slice(0, 10),
       })
       onClose()
     } finally {
@@ -240,17 +240,10 @@ function AddListingModal({ onClose, onAdded }) {
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 placeholder="Përshkruaj produktin tënd..." />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">📱 Telefon Kontakti</label>
-                <input type="tel" className="form-control" placeholder="+355 6X XXX XXXX"
-                  value={form.contact_phone} onChange={e => setForm(p => ({ ...p, contact_phone: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">📧 Email Kontakti</label>
-                <input type="email" className="form-control" placeholder="email@shembull.com"
-                  value={form.contact_email} onChange={e => setForm(p => ({ ...p, contact_email: e.target.value }))} />
-              </div>
+            <div className="form-group">
+              <label className="form-label">📱 Numri i Telefonit (për thirrje direkte)</label>
+              <input type="tel" className="form-control" placeholder="+383 4X XXX XXX"
+                value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} />
             </div>
           </div>
           <div className="modal-footer">
@@ -348,7 +341,7 @@ export default function MarketplacePage() {
         {/* Header */}
         <div className="page-header">
           <div>
-            <h1 className="page-title">🛒 Marketplace</h1>
+            <h1 className="page-title">🛒 Tregu</h1>
             <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Blej dhe shit produkte bletarie</p>
           </div>
           {user && (
