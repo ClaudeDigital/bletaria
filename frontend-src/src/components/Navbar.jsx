@@ -21,11 +21,13 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path
 
   const publicLinks = [
+    { to: '/', label: '🏠 Ballina' },
     { to: '/community', label: 'Komuniteti' },
     { to: '/marketplace', label: 'Marketplace' },
   ]
 
   const privateLinks = [
+    { to: '/', label: '🏠' },
     { to: '/dashboard', label: '🏡 Kopshtet' },
     { to: '/community', label: '💬 Komuniteti' },
     { to: '/marketplace', label: '🛒 Tregu' },

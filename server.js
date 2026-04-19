@@ -1543,7 +1543,7 @@ app.delete('/api/feeding/:id', authMiddleware, (req, res) => {
 app.get('/api/community/posts', (req, res) => {
   const { page = 1 } = req.query;
   const limit = 10, offset = (page - 1) * limit;
-  const posts = db.prepare(`
+  const raw = db.prepare(`
     SELECT p.*, u.first_name, u.last_name, u.avatar,
       COUNT(DISTINCT c.id) as comment_count
     FROM community_posts p
@@ -1552,12 +1552,25 @@ app.get('/api/community/posts', (req, res) => {
     GROUP BY p.id ORDER BY p.created_at DESC LIMIT ? OFFSET ?
   `).all(limit, offset);
   const total = db.prepare('SELECT COUNT(*) as c FROM community_posts').get().c;
+  const posts = raw.map(p => ({
+    id: p.id,
+    content: p.content,
+    image: p.image_url,
+    date: p.created_at,
+    likes: p.likes || 0,
+    liked: false,
+    comment_count: p.comment_count || 0,
+    author: {
+      name: `${p.first_name} ${p.last_name}`.trim(),
+      avatar: p.avatar || (p.first_name ? p.first_name.charAt(0).toUpperCase() : '?'),
+    }
+  }));
   res.json({ posts, total, page: parseInt(page), pages: Math.ceil(total / limit) });
 });
 app.get('/api/community/posts/:id', (req, res) => {
-  const post = db.prepare('SELECT p.*, u.first_name, u.last_name, u.avatar FROM community_posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Postimi nuk gjendet' });
-  res.json(post);
+  const p = db.prepare('SELECT p.*, u.first_name, u.last_name, u.avatar FROM community_posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?').get(req.params.id);
+  if (!p) return res.status(404).json({ error: 'Postimi nuk gjendet' });
+  res.json({ id: p.id, content: p.content, image: p.image_url, date: p.created_at, likes: p.likes || 0, liked: false, comment_count: 0, author: { name: `${p.first_name} ${p.last_name}`.trim(), avatar: p.avatar || (p.first_name ? p.first_name.charAt(0).toUpperCase() : '?') } });
 });
 app.post('/api/community/posts', authMiddleware, upload.single('image'), (req, res) => {
   const { content } = req.body;
@@ -1589,15 +1602,16 @@ app.post('/api/community/posts/:id/like', authMiddleware, (req, res) => {
   }
 });
 app.get('/api/community/posts/:id/comments', (req, res) => {
-  const comments = db.prepare('SELECT c.*, u.first_name, u.last_name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.post_id = ? ORDER BY c.created_at ASC').all(req.params.id);
-  res.json(comments);
+  const raw = db.prepare('SELECT c.*, u.first_name, u.last_name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.post_id = ? ORDER BY c.created_at ASC').all(req.params.id);
+  const comments = raw.map(c => ({ id: c.id, content: c.content, date: c.created_at, author: { name: `${c.first_name} ${c.last_name}`.trim(), avatar: c.avatar || (c.first_name ? c.first_name.charAt(0).toUpperCase() : '?') } }));
+  res.json({ comments });
 });
 app.post('/api/community/posts/:id/comments', authMiddleware, (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'Përmbajtja kërkohet' });
   const result = db.prepare('INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)').run(req.params.id, req.user.id, content.trim());
-  const comment = db.prepare('SELECT c.*, u.first_name, u.last_name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?').get(result.lastInsertRowid);
-  res.status(201).json(comment);
+  const c = db.prepare('SELECT c.*, u.first_name, u.last_name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ comment: { id: c.id, content: c.content, date: c.created_at, author: { name: `${c.first_name} ${c.last_name}`.trim(), avatar: c.avatar || (c.first_name ? c.first_name.charAt(0).toUpperCase() : '?') } } });
 });
 app.delete('/api/community/posts/:postId/comments/:commentId', authMiddleware, (req, res) => {
   const comment = db.prepare('SELECT * FROM comments WHERE id = ? AND post_id = ?').get(req.params.commentId, req.params.postId);
@@ -1617,14 +1631,15 @@ app.get('/api/marketplace', (req, res) => {
   if (max_price) { where += ' AND ml.price <= ?'; params.push(max_price); }
   if (search) { where += ' AND (ml.title LIKE ? OR ml.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   const limit = 20, offset = (page - 1) * limit;
-  const listings = db.prepare(`SELECT ml.*, u.first_name, u.last_name FROM marketplace_listings ml JOIN users u ON ml.user_id = u.id ${where} ORDER BY ml.created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+  const raw = db.prepare(`SELECT ml.*, u.first_name, u.last_name FROM marketplace_listings ml JOIN users u ON ml.user_id = u.id ${where} ORDER BY ml.created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
   const total = db.prepare(`SELECT COUNT(*) as c FROM marketplace_listings ml ${where}`).get(...params).c;
+  const listings = raw.map(l => ({ id: l.id, title: l.title, price: l.price, category: l.category, description: l.description, contact_phone: l.contact, image: l.image_url, date: l.created_at, seller: { name: `${l.first_name} ${l.last_name}`.trim() } }));
   res.json({ listings, total, page: parseInt(page), pages: Math.ceil(total / limit) });
 });
 app.get('/api/marketplace/:id', (req, res) => {
-  const listing = db.prepare('SELECT ml.*, u.first_name, u.last_name FROM marketplace_listings ml JOIN users u ON ml.user_id = u.id WHERE ml.id = ?').get(req.params.id);
-  if (!listing) return res.status(404).json({ error: 'Listimi nuk gjendet' });
-  res.json(listing);
+  const l = db.prepare('SELECT ml.*, u.first_name, u.last_name FROM marketplace_listings ml JOIN users u ON ml.user_id = u.id WHERE ml.id = ?').get(req.params.id);
+  if (!l) return res.status(404).json({ error: 'Listimi nuk gjendet' });
+  res.json({ id: l.id, title: l.title, price: l.price, category: l.category, description: l.description, contact_phone: l.contact, image: l.image_url, date: l.created_at, seller: { name: `${l.first_name} ${l.last_name}`.trim() } });
 });
 app.post('/api/marketplace', authMiddleware, upload.single('image'), (req, res) => {
   const { title, description, price, category, contact } = req.body;
@@ -1656,11 +1671,31 @@ app.post('/api/marketplace/:id/contact', authMiddleware, (req, res) => {
 
 // AI chat alias
 app.post('/api/ai/chat', authMiddleware, async (req, res) => {
-  req.body.description = req.body.message || req.body.description;
-  const handler = app._router.stack.find(l => l.route?.path === '/api/ai/recommend' && l.route?.methods?.post);
-  if (handler) return handler.route.stack[handler.route.stack.length-1].handle(req, res, () => {});
-  // fallback
-  res.json({ recommendation: 'AI asistenti nuk është konfiguruar ende. Vendos CLAUDE_API_KEY në .env.', usage: { remaining: 0 } });
+  const prompt = (req.body.message || req.body.description || req.body.prompt || '').trim();
+  if (!prompt) return res.status(400).json({ error: 'Mesazhi kërkohet' });
+
+  const monthYear = new Date().toISOString().slice(0, 7);
+  const checkAndIncrement = db.transaction(() => {
+    const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND month_year = ?').get(req.user.id, monthYear);
+    const current = usage ? usage.count : 0;
+    if (current >= AI_MONTHLY_LIMIT) return null;
+    db.prepare(`INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 1) ON CONFLICT(user_id, month_year) DO UPDATE SET count = count + 1`).run(req.user.id, monthYear);
+    return current + 1;
+  });
+
+  const newCount = checkAndIncrement();
+  if (newCount === null) {
+    return res.status(429).json({ error: `Keni arritur limitin mujor prej ${AI_MONTHLY_LIMIT} kërkesave AI.`, limit: AI_MONTHLY_LIMIT, used: AI_MONTHLY_LIMIT });
+  }
+
+  try {
+    const response = CLAUDE_API_KEY ? await callClaudeAPI(prompt) : getMockRecommendation(prompt);
+    res.json({ response, usage: { used: newCount, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - newCount } });
+  } catch (err) {
+    db.prepare(`INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 0) ON CONFLICT(user_id, month_year) DO UPDATE SET count = MAX(0, count - 1)`).run(req.user.id, monthYear);
+    const response = getMockRecommendation(prompt);
+    res.json({ response, usage: { used: newCount - 1, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - (newCount - 1) } });
+  }
 });
 app.get('/api/ai/usage', authMiddleware, (req, res) => {
   const monthYear = new Date().toISOString().substring(0, 7);
