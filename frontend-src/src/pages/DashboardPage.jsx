@@ -5,16 +5,24 @@ import { apiaryAPI } from '../api'
 import { useAuth } from '../context/AuthContext'
 
 function AddApiaryModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ name: '', rows: 3, hives_per_row: 5, location: '', notes: '' })
+  const [name, setName] = useState('')
+  const [rows, setRows] = useState([5])
+  const [location, setLocation] = useState('')
+  const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const addRow = () => setRows(r => [...r, 5])
+  const removeRow = (i) => setRows(r => r.filter((_, idx) => idx !== i))
+  const updateRow = (i, val) => setRows(r => r.map((v, idx) => idx === i ? Math.max(1, Math.min(50, parseInt(val) || 1)) : v))
+  const total = rows.reduce((s, n) => s + n, 0)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.name) { setError('Emri i kopshtit është i detyrueshëm.'); return }
+    if (!name.trim()) { setError('Emri i kopshtit është i detyrueshëm.'); return }
     setLoading(true)
     try {
-      const res = await apiaryAPI.create(form)
+      const res = await apiaryAPI.create({ name: name.trim(), row_config: rows, location, notes })
       onCreated(res.data.apiary || res.data)
       onClose()
     } catch (err) {
@@ -34,48 +42,60 @@ function AddApiaryModal({ onClose, onCreated }) {
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             {error && <div className="alert alert-error">⚠️ {error}</div>}
+
             <div className="form-group">
               <label className="form-label">Emri i Kopshtit *</label>
-              <input type="text" className="form-control" placeholder="p.sh. Kopshti i Malit" value={form.name}
-                onChange={e => setForm(p => ({ ...p, name: e.target.value }))} autoFocus />
+              <input type="text" className="form-control" placeholder="p.sh. Kopshti i Malit"
+                value={name} onChange={e => setName(e.target.value)} autoFocus />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">Rreshta</label>
-                <input type="number" className="form-control" min="1" max="20" value={form.rows}
-                  onChange={e => setForm(p => ({ ...p, rows: parseInt(e.target.value) || 1 }))} />
+
+            <div className="form-group">
+              <label className="form-label">Rreshtat dhe Kosherët</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {rows.map((count, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--muted)', minWidth: '70px', fontWeight: 600 }}>
+                      Rreshti {i + 1}
+                    </span>
+                    <input
+                      type="number" className="form-control" min="1" max="50"
+                      value={count} onChange={e => updateRow(i, e.target.value)}
+                      style={{ maxWidth: '80px' }}
+                    />
+                    <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>koshere</span>
+                    {rows.length > 1 && (
+                      <button type="button" onClick={() => removeRow(i)}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: '1rem', padding: '0 0.25rem' }}
+                        title="Hiq rreshtin">✕</button>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className="form-group">
-                <label className="form-label">Koshere/Rresht</label>
-                <input type="number" className="form-control" min="1" max="30" value={form.hives_per_row}
-                  onChange={e => setForm(p => ({ ...p, hives_per_row: parseInt(e.target.value) || 1 }))} />
-              </div>
+              <button type="button" onClick={addRow}
+                style={{ marginTop: '0.6rem', background: 'none', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', padding: '0.4rem 0.9rem', cursor: 'pointer', fontSize: '0.82rem', color: 'var(--gold-dark)', fontWeight: 600, width: '100%' }}>
+                + Shto Rresht
+              </button>
             </div>
+
             <div className="form-group">
               <label className="form-label">📍 Vendndodhja</label>
-              <input type="text" className="form-control" placeholder="p.sh. Vermosh, Shkodër" value={form.location}
-                onChange={e => setForm(p => ({ ...p, location: e.target.value }))} />
+              <input type="text" className="form-control" placeholder="p.sh. Vermosh, Shkodër"
+                value={location} onChange={e => setLocation(e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">📝 Shënime</label>
-              <textarea className="form-control" placeholder="Shënime opsionale..." value={form.notes}
-                onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={2} />
+              <textarea className="form-control" placeholder="Shënime opsionale..."
+                value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
             </div>
-            <div style={{
-              padding: '0.75rem',
-              background: 'rgba(245,166,35,0.08)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid rgba(245,166,35,0.15)',
-              fontSize: '0.82rem',
-              color: 'var(--muted)',
-            }}>
-              🐝 Kopsht me {form.rows} × {form.hives_per_row} = <strong>{form.rows * form.hives_per_row} koshere</strong> do të krijohet automatikisht
+
+            <div style={{ padding: '0.75rem', background: 'rgba(245,166,35,0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(245,166,35,0.15)', fontSize: '0.82rem', color: 'var(--muted)' }}>
+              Kopsht me <strong>{rows.length} rreshta</strong> — gjithsej <strong>{total} koshere</strong>
             </div>
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Anulo</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? '⏳ Duke krijuar...' : '🏡 Krijo Kopsht'}
+              {loading ? 'Duke krijuar...' : '🏡 Krijo Kopsht'}
             </button>
           </div>
         </form>
@@ -192,10 +212,6 @@ export default function DashboardPage() {
       const total_hives = data.reduce((s, a) => s + (a.total_hives || 0), 0)
       setStats({ total_apiaries: data.length, total_hives })
 
-      // Redirect if exactly 1 apiary
-      if (data.length === 1) {
-        navigate(`/apiary/${data[0].id}`, { replace: true })
-      }
     } catch {
       setApiaries([])
     } finally {

@@ -39,7 +39,7 @@ export default function Footer() {
               {[
                 { to: '/community', label: '💬 Komuniteti' },
                 { to: '/marketplace', label: '🛒 Marketplace' },
-                { to: '/ai', label: '🤖 AI Ndihmës' },
+                { to: '/ai', label: '🤖 Bletari AI' },
                 { to: '/login', label: '🔐 Hyr' },
                 { to: '/register', label: '📝 Regjistrohu' },
               ].map(l => (

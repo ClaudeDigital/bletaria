@@ -152,7 +152,7 @@ function TypingIndicator() {
   )
 }
 
-const FREE_LIMIT = 10
+const FREE_LIMIT = 5
 
 export default function AIPage() {
   const { user } = useAuth()
@@ -168,11 +168,11 @@ export default function AIPage() {
     // Load usage from localStorage
     const stored = localStorage.getItem('bletaria_ai_usage')
     if (stored) {
-      const { count, month } = JSON.parse(stored)
-      const currentMonth = new Date().getMonth()
-      if (month === currentMonth) setUsageCount(count)
+      const { count, day } = JSON.parse(stored)
+      const today = new Date().toISOString().slice(0, 10)
+      if (day === today) setUsageCount(count)
       else {
-        localStorage.setItem('bletaria_ai_usage', JSON.stringify({ count: 0, month: currentMonth }))
+        localStorage.setItem('bletaria_ai_usage', JSON.stringify({ count: 0, day: today }))
       }
     }
     // Also fetch from server
@@ -186,8 +186,8 @@ export default function AIPage() {
   }, [messages, loading])
 
   const saveUsage = (count) => {
-    const month = new Date().getMonth()
-    localStorage.setItem('bletaria_ai_usage', JSON.stringify({ count, month }))
+    const day = new Date().toISOString().slice(0, 10)
+    localStorage.setItem('bletaria_ai_usage', JSON.stringify({ count, day }))
     setUsageCount(count)
   }
 
@@ -357,10 +357,10 @@ export default function AIPage() {
         }}>
           <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>⛔</div>
           <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--red)', marginBottom: '0.25rem' }}>
-            Limite mujore e arritur
+            Limite ditore e arritur
           </div>
           <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-            Ke përdorur {FREE_LIMIT}/{FREE_LIMIT} kërkesa falas. Abonohu Premium për kërkesa të pakufizuara.
+            Ke përdorur {FREE_LIMIT}/{FREE_LIMIT} pyetje falas sot. Limiti riset nesër, ose abonohu Premium për pyetje të pakufizuara.
           </div>
           <button className="btn btn-primary btn-sm" style={{ marginTop: '0.5rem' }}>
             ⭐ Abono Premium — €4.99/muaj

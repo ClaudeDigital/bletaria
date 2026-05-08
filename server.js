@@ -18,10 +18,12 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'bletaria-secret-2025';
 const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'admin-bletaria-2025';
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8739133614:AAErhgGg-lAeZ6SuMJfJFQplI10zq-7uwhI';
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '1613742845';
 const DATA_DIR = '/opt/bletaria/data';
 const UPLOADS_DIR = '/opt/bletaria/uploads';
 const DB_PATH = path.join(DATA_DIR, 'bletaria.db');
-const AI_MONTHLY_LIMIT = 10;
+const AI_DAILY_LIMIT = 5;
 
 // ─── Directory Setup ──────────────────────────────────────────────────────────
 
@@ -88,9 +90,16 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     apiary_id INTEGER NOT NULL,
     visit_date TEXT NOT NULL,
+    status TEXT DEFAULT 'completed',
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (apiary_id) REFERENCES apiaries(id)
+  );
+  CREATE TABLE IF NOT EXISTS visit_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visit_id INTEGER NOT NULL UNIQUE,
+    sent_at DATETIME,
+    FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS hive_visit_data (
@@ -121,6 +130,8 @@ db.exec(`
     apiary_id INTEGER NOT NULL,
     plan_date TEXT NOT NULL,
     description TEXT,
+    food_amount TEXT,
+    medicine TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (apiary_id) REFERENCES apiaries(id)
   );
@@ -134,6 +145,18 @@ db.exec(`
     notes TEXT,
     FOREIGN KEY (feeding_plan_id) REFERENCES feeding_plans(id) ON DELETE CASCADE,
     FOREIGN KEY (hive_id) REFERENCES hives(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT DEFAULT 'info',
+    title TEXT NOT NULL,
+    message TEXT,
+    link TEXT,
+    read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS community_posts (
@@ -196,9 +219,9 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS ai_usage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    month_year TEXT NOT NULL,
+    day_date TEXT NOT NULL,
     count INTEGER DEFAULT 0,
-    UNIQUE(user_id, month_year),
+    UNIQUE(user_id, day_date),
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
@@ -265,6 +288,35 @@ Enët prej qelqi janë ideale për ruajtje - shmangni plastikën. Temperatura e 
   sampleNews.forEach(n => insertNews.run(n.title, n.content, n.image_url));
   console.log('Sample news inserted.');
 }
+
+// ─── Migrations ───────────────────────────────────────────────────────────────
+
+function runMigrations() {
+  const cols = db.prepare("PRAGMA table_info(visits)").all().map(c => c.name);
+  if (!cols.includes('status')) {
+    db.prepare("ALTER TABLE visits ADD COLUMN status TEXT DEFAULT 'completed'").run();
+  }
+  const fpCols = db.prepare("PRAGMA table_info(feeding_plans)").all().map(c => c.name);
+  if (!fpCols.includes('food_amount')) {
+    db.prepare("ALTER TABLE feeding_plans ADD COLUMN food_amount TEXT").run();
+  }
+  if (!fpCols.includes('medicine')) {
+    db.prepare("ALTER TABLE feeding_plans ADD COLUMN medicine TEXT").run();
+  }
+  // Create notifications table if missing (for existing DBs)
+  db.prepare(`CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    type TEXT DEFAULT 'info',
+    title TEXT NOT NULL,
+    message TEXT,
+    link TEXT,
+    read INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`).run();
+}
+runMigrations();
 
 // ─── Express App ──────────────────────────────────────────────────────────────
 
@@ -488,20 +540,24 @@ app.get('/api/apiaries', authMiddleware, (req, res) => {
 
 // POST /api/apiaries
 app.post('/api/apiaries', authMiddleware, (req, res) => {
-  const { name, rows, hives_per_row } = req.body;
-  if (!name || !rows || !hives_per_row) {
-    return res.status(400).json({ error: 'Emri, rreshtat dhe kosherët për rresht janë të detyrueshëm' });
-  }
-  const r = parseInt(rows);
-  const c = parseInt(hives_per_row);
-  if (r < 1 || r > 50 || c < 1 || c > 50) {
-    return res.status(400).json({ error: 'Rreshtat dhe kosherët duhet të jenë ndërmjet 1 dhe 50' });
+  const { name, rows, hives_per_row, row_config } = req.body;
+  if (!name) return res.status(400).json({ error: 'Emri i kopshtit është i detyrueshëm' });
+
+  let rowCounts;
+  if (Array.isArray(row_config) && row_config.length > 0) {
+    rowCounts = row_config.map(n => Math.max(1, Math.min(50, parseInt(n) || 1)));
+  } else if (rows && hives_per_row) {
+    const r = Math.max(1, Math.min(50, parseInt(rows)));
+    const c = Math.max(1, Math.min(50, parseInt(hives_per_row)));
+    rowCounts = Array(r).fill(c);
+  } else {
+    return res.status(400).json({ error: 'Konfigurimi i rreshtave është i detyrueshëm' });
   }
 
   const createApiary = db.transaction(() => {
     const result = db.prepare(
       'INSERT INTO apiaries (user_id, name, rows, hives_per_row) VALUES (?, ?, ?, ?)'
-    ).run(req.user.id, name.trim(), r, c);
+    ).run(req.user.id, name.trim(), rowCounts.length, Math.max(...rowCounts));
     const apiaryId = result.lastInsertRowid;
 
     const insertHive = db.prepare(
@@ -511,10 +567,10 @@ app.post('/api/apiaries', authMiddleware, (req, res) => {
       'INSERT INTO hive_floors (hive_id, floor_number) VALUES (?, 1)'
     );
 
-    for (let row = 1; row <= r; row++) {
-      for (let col = 1; col <= c; col++) {
-        const code = `K${apiaryId}-R${row}C${col}`;
-        const hiveResult = insertHive.run(apiaryId, row, col, code, 'good');
+    for (let ri = 0; ri < rowCounts.length; ri++) {
+      for (let col = 1; col <= rowCounts[ri]; col++) {
+        const code = `K${apiaryId}-R${ri + 1}C${col}`;
+        const hiveResult = insertHive.run(apiaryId, ri + 1, col, code, 'good');
         insertFloor.run(hiveResult.lastInsertRowid);
       }
     }
@@ -623,6 +679,15 @@ app.put('/api/hives/:id', authMiddleware, (req, res) => {
   res.json({ ...updated, code: updated.unique_code });
 });
 
+// PATCH /api/hives/:id/notes
+app.patch('/api/hives/:id/notes', authMiddleware, (req, res) => {
+  const hive = getOwnedHive(req.params.id, req.user.id);
+  if (!hive) return res.status(404).json({ error: 'Kosherjа nuk gjendet' });
+  const { notes } = req.body;
+  db.prepare('UPDATE hives SET notes = ? WHERE id = ?').run(notes || null, hive.id);
+  res.json({ id: hive.id, notes: notes || null });
+});
+
 // DELETE /api/hives/:id
 app.delete('/api/hives/:id', authMiddleware, (req, res) => {
   const hive = getOwnedHive(req.params.id, req.user.id);
@@ -695,13 +760,17 @@ app.post('/api/apiaries/:id/visits', authMiddleware, (req, res) => {
   const apiary = getOwnedApiary(req.params.id, req.user.id);
   if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
 
-  const { visit_date, notes, hive_data } = req.body;
+  const { visit_date, notes, hive_data, status } = req.body;
   if (!visit_date) return res.status(400).json({ error: 'Data e vizitës është e detyrueshme' });
+
+  // Auto-detect planned status based on date
+  const today = new Date().toISOString().slice(0, 10);
+  const visitStatus = status || (visit_date > today ? 'planned' : 'completed');
 
   const createVisit = db.transaction(() => {
     const visitResult = db.prepare(
-      'INSERT INTO visits (apiary_id, visit_date, notes) VALUES (?, ?, ?)'
-    ).run(apiary.id, visit_date, notes || null);
+      'INSERT INTO visits (apiary_id, visit_date, status, notes) VALUES (?, ?, ?, ?)'
+    ).run(apiary.id, visit_date, visitStatus, notes || null);
     const visitId = visitResult.lastInsertRowid;
 
     if (Array.isArray(hive_data)) {
@@ -780,6 +849,24 @@ app.get('/api/visits/:id', authMiddleware, (req, res) => {
   res.json({ ...visit, hive_data: enriched });
 });
 
+// PATCH /api/visits/:id/status
+app.patch('/api/visits/:id/status', authMiddleware, (req, res) => {
+  const visit = db.prepare(`SELECT v.* FROM visits v JOIN apiaries a ON v.apiary_id = a.id WHERE v.id = ? AND a.user_id = ?`).get(req.params.id, req.user.id);
+  if (!visit) return res.status(404).json({ error: 'Vizita nuk gjendet' });
+  const { status } = req.body;
+  if (!['planned', 'completed'].includes(status)) return res.status(400).json({ error: 'Status i pavlefshëm' });
+  db.prepare('UPDATE visits SET status = ? WHERE id = ?').run(status, visit.id);
+  res.json({ ...visit, status });
+});
+
+// DELETE /api/visits/:id
+app.delete('/api/visits/:id', authMiddleware, (req, res) => {
+  const visit = db.prepare(`SELECT v.* FROM visits v JOIN apiaries a ON v.apiary_id = a.id WHERE v.id = ? AND a.user_id = ?`).get(req.params.id, req.user.id);
+  if (!visit) return res.status(404).json({ error: 'Vizita nuk gjendet' });
+  db.prepare('DELETE FROM visits WHERE id = ?').run(visit.id);
+  res.json({ message: 'Vizita u fshi' });
+});
+
 // ─── FEEDING PLANS ────────────────────────────────────────────────────────────
 
 // GET /api/apiaries/:id/feeding-plans
@@ -805,13 +892,13 @@ app.post('/api/apiaries/:id/feeding-plans', authMiddleware, (req, res) => {
   const apiary = getOwnedApiary(req.params.id, req.user.id);
   if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
 
-  const { plan_date, description, hive_plans } = req.body;
+  const { plan_date, description, food_amount, medicine, hive_plans } = req.body;
   if (!plan_date) return res.status(400).json({ error: 'Data e planit është e detyrueshme' });
 
   const createPlan = db.transaction(() => {
     const result = db.prepare(
-      'INSERT INTO feeding_plans (apiary_id, plan_date, description) VALUES (?, ?, ?)'
-    ).run(apiary.id, plan_date, description || null);
+      'INSERT INTO feeding_plans (apiary_id, plan_date, description, food_amount, medicine) VALUES (?, ?, ?, ?, ?)'
+    ).run(apiary.id, plan_date, description || null, food_amount || null, medicine || null);
     const planId = result.lastInsertRowid;
 
     if (Array.isArray(hive_plans)) {
@@ -821,7 +908,8 @@ app.post('/api/apiaries/:id/feeding-plans', authMiddleware, (req, res) => {
       hive_plans.forEach(hp => {
         const hive = db.prepare('SELECT id FROM hives WHERE id = ? AND apiary_id = ?').get(hp.hive_id, apiary.id);
         if (!hive) return;
-        insertHp.run(planId, hp.hive_id, hp.food_amount || null, hp.medicine || null, hp.notes || null);
+        // Per-hive inherits plan food_amount/medicine if not specified
+        insertHp.run(planId, hp.hive_id, hp.food_amount || food_amount || null, hp.medicine || medicine || null, hp.notes || null);
       });
     }
 
@@ -1348,28 +1436,28 @@ app.post('/api/ai/recommend', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Pyetja është e detyrueshme' });
   }
 
-  const monthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const dayDate = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 
   // Check and increment usage atomically
   const checkAndIncrement = db.transaction(() => {
-    const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND month_year = ?').get(req.user.id, monthYear);
+    const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND day_date = ?').get(req.user.id, dayDate);
     const current = usage ? usage.count : 0;
-    if (current >= AI_MONTHLY_LIMIT) {
+    if (current >= AI_DAILY_LIMIT) {
       return null; // Over limit
     }
     db.prepare(`
-      INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 1)
-      ON CONFLICT(user_id, month_year) DO UPDATE SET count = count + 1
-    `).run(req.user.id, monthYear);
+      INSERT INTO ai_usage (user_id, day_date, count) VALUES (?, ?, 1)
+      ON CONFLICT(user_id, day_date) DO UPDATE SET count = count + 1
+    `).run(req.user.id, dayDate);
     return current + 1;
   });
 
   const newCount = checkAndIncrement();
   if (newCount === null) {
     return res.status(429).json({
-      error: `Keni arritur limitin mujor prej ${AI_MONTHLY_LIMIT} kërkesave AI. Provo sërish muajin e ardhshëm.`,
-      limit: AI_MONTHLY_LIMIT,
-      used: AI_MONTHLY_LIMIT
+      error: `Keni arritur limitin ditor prej ${AI_DAILY_LIMIT} pyetjeve falas. Provo sërish nesër.`,
+      limit: AI_DAILY_LIMIT,
+      used: AI_DAILY_LIMIT
     });
   }
 
@@ -1382,20 +1470,20 @@ app.post('/api/ai/recommend', authMiddleware, async (req, res) => {
     }
     res.json({
       recommendation,
-      usage: { used: newCount, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - newCount }
+      usage: { used: newCount, limit: AI_DAILY_LIMIT, remaining: AI_DAILY_LIMIT - newCount }
     });
   } catch (err) {
     console.error('AI API error:', err.message);
     // On API error, return mock and don't deduct the usage
     db.prepare(`
-      INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 0)
-      ON CONFLICT(user_id, month_year) DO UPDATE SET count = MAX(0, count - 1)
-    `).run(req.user.id, monthYear);
+      INSERT INTO ai_usage (user_id, day_date, count) VALUES (?, ?, 0)
+      ON CONFLICT(user_id, day_date) DO UPDATE SET count = MAX(0, count - 1)
+    `).run(req.user.id, dayDate);
 
     const recommendation = getMockRecommendation(prompt.trim());
     res.json({
       recommendation,
-      usage: { used: newCount - 1, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - (newCount - 1) },
+      usage: { used: newCount - 1, limit: AI_DAILY_LIMIT, remaining: AI_DAILY_LIMIT - (newCount - 1) },
       note: 'Përgjigje lokale (API e jashtme nuk ishte e disponueshme)'
     });
   }
@@ -1664,13 +1752,15 @@ app.get('/api/visits', authMiddleware, (req, res) => {
   res.json(visits);
 });
 app.post('/api/visits', authMiddleware, (req, res) => {
-  const { apiary_id, visit_date, notes, hive_data } = req.body;
+  const { apiary_id, visit_date, notes, hive_data, status } = req.body;
   if (!apiary_id || !visit_date) return res.status(400).json({ error: 'apiary_id dhe visit_date kërkohen' });
   const apiary = getOwnedApiary(apiary_id, req.user.id);
   if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
-  
+  const today2 = new Date().toISOString().slice(0, 10);
+  const visitStatus2 = status || (visit_date > today2 ? 'planned' : 'completed');
+
   const createVisit = db.transaction(() => {
-    const result = db.prepare('INSERT INTO visits (apiary_id, visit_date, notes) VALUES (?, ?, ?)').run(apiary_id, visit_date, notes || null);
+    const result = db.prepare('INSERT INTO visits (apiary_id, visit_date, status, notes) VALUES (?, ?, ?, ?)').run(apiary_id, visit_date, visitStatus2, notes || null);
     const visitId = result.lastInsertRowid;
     if (hive_data && Array.isArray(hive_data)) {
       hive_data.forEach(hd => {
@@ -1695,6 +1785,36 @@ app.put('/api/visits/:id', authMiddleware, (req, res) => {
 app.delete('/api/visits/:id', authMiddleware, (req, res) => {
   db.prepare('DELETE FROM visits WHERE id = ?').run(req.params.id);
   res.json({ message: 'U fshi' });
+});
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+
+app.get('/api/notifications', authMiddleware, (req, res) => {
+  const notifs = db.prepare(`
+    SELECT * FROM notifications WHERE user_id = ?
+    ORDER BY created_at DESC LIMIT 50
+  `).all(req.user.id);
+  res.json(notifs);
+});
+
+app.get('/api/notifications/unread-count', authMiddleware, (req, res) => {
+  const row = db.prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0').get(req.user.id);
+  res.json({ count: row.count });
+});
+
+app.patch('/api/notifications/:id/read', authMiddleware, (req, res) => {
+  db.prepare('UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  res.json({ ok: true });
+});
+
+app.patch('/api/notifications/read-all', authMiddleware, (req, res) => {
+  db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(req.user.id);
+  res.json({ ok: true });
+});
+
+app.delete('/api/notifications/:id', authMiddleware, (req, res) => {
+  db.prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  res.json({ ok: true });
 });
 
 // Feeding alias routes
@@ -1866,33 +1986,33 @@ app.post('/api/ai/chat', authMiddleware, async (req, res) => {
   const prompt = (req.body.message || req.body.description || req.body.prompt || '').trim();
   if (!prompt) return res.status(400).json({ error: 'Mesazhi kërkohet' });
 
-  const monthYear = new Date().toISOString().slice(0, 7);
+  const dayDate = new Date().toISOString().slice(0, 10);
   const checkAndIncrement = db.transaction(() => {
-    const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND month_year = ?').get(req.user.id, monthYear);
+    const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND day_date = ?').get(req.user.id, dayDate);
     const current = usage ? usage.count : 0;
-    if (current >= AI_MONTHLY_LIMIT) return null;
-    db.prepare(`INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 1) ON CONFLICT(user_id, month_year) DO UPDATE SET count = count + 1`).run(req.user.id, monthYear);
+    if (current >= AI_DAILY_LIMIT) return null;
+    db.prepare(`INSERT INTO ai_usage (user_id, day_date, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day_date) DO UPDATE SET count = count + 1`).run(req.user.id, dayDate);
     return current + 1;
   });
 
   const newCount = checkAndIncrement();
   if (newCount === null) {
-    return res.status(429).json({ error: `Keni arritur limitin mujor prej ${AI_MONTHLY_LIMIT} kërkesave AI.`, limit: AI_MONTHLY_LIMIT, used: AI_MONTHLY_LIMIT });
+    return res.status(429).json({ error: `Keni arritur limitin ditor prej ${AI_DAILY_LIMIT} pyetjeve falas. Provo sërish nesër.`, limit: AI_DAILY_LIMIT, used: AI_DAILY_LIMIT });
   }
 
   try {
     const response = CLAUDE_API_KEY ? await callClaudeAPI(prompt) : getMockRecommendation(prompt);
-    res.json({ response, usage: { used: newCount, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - newCount } });
+    res.json({ response, usage: { used: newCount, limit: AI_DAILY_LIMIT, remaining: AI_DAILY_LIMIT - newCount } });
   } catch (err) {
-    db.prepare(`INSERT INTO ai_usage (user_id, month_year, count) VALUES (?, ?, 0) ON CONFLICT(user_id, month_year) DO UPDATE SET count = MAX(0, count - 1)`).run(req.user.id, monthYear);
+    db.prepare(`INSERT INTO ai_usage (user_id, day_date, count) VALUES (?, ?, 0) ON CONFLICT(user_id, day_date) DO UPDATE SET count = MAX(0, count - 1)`).run(req.user.id, dayDate);
     const response = getMockRecommendation(prompt);
-    res.json({ response, usage: { used: newCount - 1, limit: AI_MONTHLY_LIMIT, remaining: AI_MONTHLY_LIMIT - (newCount - 1) } });
+    res.json({ response, usage: { used: newCount - 1, limit: AI_DAILY_LIMIT, remaining: AI_DAILY_LIMIT - (newCount - 1) } });
   }
 });
 app.get('/api/ai/usage', authMiddleware, (req, res) => {
-  const monthYear = new Date().toISOString().substring(0, 7);
-  const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND month_year = ?').get(req.user.id, monthYear);
-  res.json({ count: usage?.count || 0, limit: AI_MONTHLY_LIMIT, remaining: Math.max(0, AI_MONTHLY_LIMIT - (usage?.count || 0)) });
+  const dayDate = new Date().toISOString().slice(0, 10);
+  const usage = db.prepare('SELECT count FROM ai_usage WHERE user_id = ? AND day_date = ?').get(req.user.id, dayDate);
+  res.json({ count: usage?.count || 0, limit: AI_DAILY_LIMIT, remaining: Math.max(0, AI_DAILY_LIMIT - (usage?.count || 0)) });
 });
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
@@ -1975,6 +2095,50 @@ function seedSampleData() {
   }
 }
 
+// ─── In-App Notifications ─────────────────────────────────────────────────────
+
+function checkVisitReminders() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+  const planned = db.prepare(`
+    SELECT v.id, v.visit_date, v.notes, v.apiary_id, a.name as apiary_name, a.user_id
+    FROM visits v
+    JOIN apiaries a ON a.id = v.apiary_id
+    LEFT JOIN visit_notifications vn ON vn.visit_id = v.id
+    WHERE v.status = 'planned'
+      AND v.visit_date = ?
+      AND vn.id IS NULL
+  `).all(tomorrowStr);
+
+  for (const v of planned) {
+    const dateFormatted = new Date(v.visit_date).toLocaleDateString('sq-AL', { day: 'numeric', month: 'long', year: 'numeric' });
+    db.prepare(`
+      INSERT INTO notifications (user_id, type, title, message, link)
+      VALUES (?, 'visit', ?, ?, ?)
+    `).run(
+      v.user_id,
+      `📅 Vizitë nesër — ${v.apiary_name}`,
+      `Ke vizitë të planifikuar për ${dateFormatted}.${v.notes ? ' ' + v.notes : ''}`,
+      `/apiary/${v.apiary_id}`
+    );
+    db.prepare(`INSERT OR IGNORE INTO visit_notifications (visit_id, sent_at) VALUES (?, datetime('now'))`).run(v.id);
+  }
+  if (planned.length > 0) console.log(`Created ${planned.length} visit reminder notifications`);
+}
+
+function scheduleDailyReminders() {
+  const now = new Date();
+  const next8am = new Date(now);
+  next8am.setHours(8, 0, 0, 0);
+  if (next8am <= now) next8am.setDate(next8am.getDate() + 1);
+  setTimeout(() => {
+    checkVisitReminders();
+    setInterval(checkVisitReminders, 24 * 60 * 60 * 1000);
+  }, next8am - now);
+}
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
@@ -1983,4 +2147,5 @@ app.listen(PORT, () => {
   console.log(`Uploads: ${UPLOADS_DIR}`);
   console.log(`Claude AI: ${CLAUDE_API_KEY ? 'Enabled' : 'Mock mode'}`);
   try { seedSampleData(); } catch (e) { console.log('Seed skipped:', e.message); }
+  scheduleDailyReminders();
 });

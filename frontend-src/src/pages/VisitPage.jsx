@@ -147,7 +147,7 @@ export default function VisitPage() {
 
           {/* Hives */}
           <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>
-            🐝 Koshereat ({hives.length})
+            Koshere ({hives.length})
             <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 400, marginLeft: '0.5rem' }}>
               — Kliko për të zgjeruar çdo koshère
             </span>

@@ -7,7 +7,7 @@ const SAMPLE_POSTS = [
   {
     id: 1,
     author: { name: 'Agim Berisha', avatar: 'A', location: 'Shkodër' },
-    content: 'Sot bëra vizitën e parë të pranverës! Koshereat janë në gjendje të shkëlqyer. 15 nga 18 koshere me mbretëreshë aktive. 🐝🍯',
+    content: 'Sot bëra vizitën e parë të pranverës! Koshere janë në gjendje të shkëlqyer. 15 nga 18 koshere me mbretëreshë aktive.',
     date: '2026-04-17T10:30:00Z',
     likes: 24,
     liked: false,

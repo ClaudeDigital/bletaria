@@ -89,6 +89,7 @@ export const hiveAPI = {
   updateFloor: (hiveId, floorId, data) => api.put(`/hives/${hiveId}/floors/${floorId}`, data),
   deleteFloor: (hiveId, floorId) => api.delete(`/hives/${hiveId}/floors/${floorId}`),
   visits: (id) => api.get(`/hives/${id}/visits`),
+  patchNotes: (id, notes) => api.patch(`/hives/${id}/notes`, { notes }),
 }
 
 // Visits (Vizitat)
@@ -97,6 +98,7 @@ export const visitAPI = {
   get: (id) => api.get(`/visits/${id}`),
   create: (data) => api.post('/visits', data),
   update: (id, data) => api.put(`/visits/${id}`, data),
+  patchStatus: (id, status) => api.patch(`/visits/${id}/status`, { status }),
   delete: (id) => api.delete(`/visits/${id}`),
 }
 
@@ -107,6 +109,15 @@ export const feedingAPI = {
   create: (data) => api.post('/feeding', data),
   update: (id, data) => api.put(`/feeding/${id}`, data),
   delete: (id) => api.delete(`/feeding/${id}`),
+}
+
+// Notifications
+export const notifAPI = {
+  list: () => api.get('/notifications'),
+  unreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
+  delete: (id) => api.delete(`/notifications/${id}`),
 }
 
 // Community (Komuniteti)

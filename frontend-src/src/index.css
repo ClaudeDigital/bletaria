@@ -23,18 +23,18 @@
   --radius-sm: 8px;
   --radius-lg: 16px;
   --transition: all 0.2s ease;
-  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 [data-theme="dark"] {
-  --bg: #1a1209;
-  --surface: #231a0f;
-  --card: #2d2010;
-  --text: #f5ede0;
-  --muted: #a08060;
-  --border: #3d2d1a;
-  --shadow: rgba(0,0,0,0.4);
-  --shadow-md: rgba(0,0,0,0.6);
+  --bg: #0f0e11;
+  --surface: #18171c;
+  --card: #21202a;
+  --text: #ede9e2;
+  --muted: #887f75;
+  --border: #2e2c35;
+  --shadow: rgba(0,0,0,0.45);
+  --shadow-md: rgba(0,0,0,0.65);
 }
 
 /* Reset & Base */

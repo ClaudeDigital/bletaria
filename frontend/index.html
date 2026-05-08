@@ -2,14 +2,36 @@
 <html lang="sq">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Bletaria Ime - Menaxho Bletarinë Tënde Me Dashuri" />
-    <title>Bletaria Ime 🍯</title>
-    <script type="module" crossorigin src="/assets/index-QsuDhE3_.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BLYhNJb5.css">
+    <title>Bletaria Ime</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#F5A623" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bletaria" />
+    <meta name="application-name" content="Bletaria Ime" />
+    <meta name="msapplication-TileColor" content="#F5A623" />
+    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <script type="module" crossorigin src="/assets/index-BYnY3m9F.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BRGGz1Wz.css">
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

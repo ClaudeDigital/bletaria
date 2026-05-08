@@ -342,7 +342,7 @@ export default function MarketplacePage() {
         {/* Header */}
         <div className="page-header">
           <div>
-            <h1 className="page-title">🛒 Tregu</h1>
+            <h1 className="page-title">Tregu</h1>
             <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Blej dhe shit produkte bletarie</p>
           </div>
           {user && (

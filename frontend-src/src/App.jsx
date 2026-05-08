@@ -20,6 +20,7 @@ import MarketplacePage from './pages/MarketplacePage'
 import AIPage from './pages/AIPage'
 import ProfilePage from './pages/ProfilePage'
 import AdminPage from './pages/AdminPage'
+import DonatePage from './pages/DonatePage'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
@@ -39,6 +40,7 @@ function AppRoutes() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/donate" element={<DonatePage />} />
           <Route path="/admin" element={<AdminPage />} />
 
           {/* Protected routes */}

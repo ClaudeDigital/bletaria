@@ -1,7 +1,7 @@
 import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { apiaryAPI, hiveAPI } from '../api'
+import { apiaryAPI, hiveAPI, visitAPI } from '../api'
 
 const STATUS_CONFIG = {
   good:    { color: '#4A7C59', label: 'Mirë',    emoji: '✅' },
@@ -188,6 +188,99 @@ function HiveDetailModal({ hive, apiaryId, onClose, onUpdated }) {
   )
 }
 
+function PlanVisitModal({ apiaryId, onClose, onPlanned }) {
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10)
+  const [date, setDate] = useState(tomorrowStr)
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!date) { setError('Zgjidh datën'); return }
+    setSaving(true)
+    try {
+      const res = await visitAPI.create({ apiary_id: apiaryId, visit_date: date, notes, status: 'planned' })
+      onPlanned(res.data)
+      onClose()
+    } catch { setError('Gabim duke ruajtur.') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: '420px' }}>
+        <div className="modal-header">
+          <span className="modal-title">📅 Planifiko Vizitë</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            {error && <div className="alert alert-error">⚠️ {error}</div>}
+            <div className="form-group">
+              <label className="form-label">📅 Data e vizitës</label>
+              <input type="date" className="form-control" value={date} min={tomorrowStr}
+                onChange={e => setDate(e.target.value)} required />
+              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '0.35rem' }}>
+                🔔 Do të marrësh njoftim Telegram 1 ditë para vizitës
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">📝 Shënime (opsionale)</label>
+              <textarea className="form-control" rows={2} value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="p.sh. Kontroll i mbretëreshës, trajtim Varroa..." />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Anulo</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? '⏳' : '📅 Ruaj Planin'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function HiveNotesModal({ hive, onClose, onSaved }) {
+  const [notes, setNotes] = useState(hive.notes || '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await hiveAPI.patchNotes(hive.id, notes)
+      onSaved({ ...hive, notes })
+      onClose()
+    } catch {} finally { setSaving(false) }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: '420px' }}>
+        <div className="modal-header">
+          <span className="modal-title">📝 Shënime — Koshère {hive.code}</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <textarea className="form-control" rows={4} value={notes} autoFocus
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Shënime specifike për këtë koshère..." />
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Anulo</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? '⏳' : '💾 Ruaj'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ApiaryPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -196,6 +289,9 @@ export default function ApiaryPage() {
   const [loading, setLoading] = useState(true)
   const [selectedHive, setSelectedHive] = useState(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showPlanVisit, setShowPlanVisit] = useState(false)
+  const [notesHive, setNotesHive] = useState(null)
+  const [plannedVisits, setPlannedVisits] = useState([])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -205,18 +301,29 @@ export default function ApiaryPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [apiaryRes, hivesRes] = await Promise.all([
+      const [apiaryRes, hivesRes, visitsRes] = await Promise.all([
         apiaryAPI.get(id),
         hiveAPI.list(id),
+        visitAPI.list(id),
       ])
       setApiary(apiaryRes.data.apiary || apiaryRes.data)
       const h = hivesRes.data.hives || hivesRes.data || []
       setHives(Array.isArray(h) ? h : [])
+      const allVisits = visitsRes.data || []
+      setPlannedVisits(allVisits.filter(v => v.status === 'planned').sort((a, b) => a.visit_date.localeCompare(b.visit_date)))
     } catch {
       setError('Kopshti nuk u gjet.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const cancelPlannedVisit = async (visitId) => {
+    if (!window.confirm('Anulo vizitën e planifikuar?')) return
+    try {
+      await visitAPI.delete(visitId)
+      setPlannedVisits(prev => prev.filter(v => v.id !== visitId))
+    } catch {}
   }
 
   const handleDeleteApiary = async () => {
@@ -278,13 +385,10 @@ export default function ApiaryPage() {
             )}
           </div>
           <div className="page-actions">
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowPlanVisit(true)}>📅 Planifiko Vizitë</button>
             <Link to={`/apiary/${id}/visit`} className="btn btn-primary">📝 Shto Vizitë</Link>
             <Link to={`/apiary/${id}/feeding`} className="btn btn-green">🌿 Plan Ushqimi</Link>
-            <button
-              className="btn btn-danger btn-sm"
-              onClick={() => setShowDeleteConfirm(true)}
-              title="Fshi Kopsht"
-            >🗑</button>
+            <button className="btn btn-danger btn-sm" onClick={() => setShowDeleteConfirm(true)} title="Fshi Kopsht">🗑</button>
           </div>
         </div>
 
@@ -292,8 +396,7 @@ export default function ApiaryPage() {
         <div className="stats-grid" style={{ marginBottom: '2rem' }}>
           <div className="stat-card">
             <div className="stat-value">{hives.length}</div>
-            <div className="stat-label">Gjithsej Koshere</div>
-          </div>
+            <div className="stat-label">Gjithsej Koshere</div>          </div>
           <div className="stat-card">
             <div className="stat-value" style={{ color: '#4A7C59' }}>{statusCounts.good || 0}</div>
             <div className="stat-label">✅ Mirë</div>
@@ -312,7 +415,7 @@ export default function ApiaryPage() {
         <div className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <h2 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              🐝 Koshereat — {rows} rreshta × {hivesPerRow} = {hives.length}
+              🐝 Koshere ({hives.length} gjithsej)
             </h2>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
               {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
@@ -345,6 +448,27 @@ export default function ApiaryPage() {
           </div>
         </div>
 
+        {/* Planned Visits */}
+        {plannedVisits.length > 0 && (
+          <div className="card" style={{ marginBottom: '2rem', borderLeft: '3px solid var(--gold)' }}>
+            <div className="card-header" style={{ color: 'var(--gold)' }}>📅 Vizita të Planifikuara</div>
+            <div style={{ padding: '0.5rem 1.25rem 1rem' }}>
+              {plannedVisits.map(v => (
+                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.6rem 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                  <div style={{ background: 'rgba(245,166,35,0.1)', color: 'var(--gold)', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', fontWeight: 700 }}>
+                    {new Date(v.visit_date).toLocaleDateString('sq-AL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </div>
+                  {v.notes && <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>📝 {v.notes}</span>}
+                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+                    <Link to={`/apiary/${id}/visit`} className="btn btn-primary btn-sm">📝 Regjistro</Link>
+                    <button className="btn btn-ghost btn-sm" onClick={() => cancelPlannedVisit(v.id)}>✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Notes */}
         {apiary?.notes && (
           <div className="card card-body" style={{ marginBottom: '2rem' }}>
@@ -365,6 +489,7 @@ export default function ApiaryPage() {
                   <th>Mbretëresha</th>
                   <th>Mosha</th>
                   <th>Katet</th>
+                  <th>Shënim</th>
                   <th>Veprime</th>
                 </tr>
               </thead>
@@ -395,6 +520,12 @@ export default function ApiaryPage() {
                       </td>
                       <td style={{ color: 'var(--muted)' }}>{h.floor_count || 0}</td>
                       <td>
+                        {h.notes
+                          ? <span style={{ fontSize: '0.78rem', color: 'var(--muted)', maxWidth: '120px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle', cursor: 'pointer' }} onClick={() => setNotesHive(h)} title={h.notes}>{h.notes}</span>
+                          : <button className="btn btn-ghost btn-sm" onClick={() => setNotesHive(h)} style={{ fontSize: '0.75rem' }}>+ Shënim</button>
+                        }
+                      </td>
+                      <td>
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
                           <button className="btn btn-ghost btn-sm" onClick={() => setSelectedHive(h)}>✏️</button>
                           <Link to={`/hive/${h.id}`} className="btn btn-ghost btn-sm">📋</Link>
@@ -419,6 +550,22 @@ export default function ApiaryPage() {
             handleHiveUpdated(updated)
             setSelectedHive(null)
           }}
+        />
+      )}
+
+      {showPlanVisit && (
+        <PlanVisitModal
+          apiaryId={id}
+          onClose={() => setShowPlanVisit(false)}
+          onPlanned={v => { setPlannedVisits(prev => [...prev, v].sort((a, b) => a.visit_date.localeCompare(b.visit_date))); setShowPlanVisit(false) }}
+        />
+      )}
+
+      {notesHive && (
+        <HiveNotesModal
+          hive={notesHive}
+          onClose={() => setNotesHive(null)}
+          onSaved={updated => { setHives(prev => prev.map(h => h.id === updated.id ? updated : h)); setNotesHive(null) }}
         />
       )}
 
