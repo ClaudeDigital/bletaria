@@ -428,6 +428,18 @@ function adminMiddleware(req, res, next) {
   }
 }
 
+
+// Pronësia: çdo burim duhet t'i takojë përdoruesit të kyçur
+function ownsHive(hiveId, userId) {
+  return db.prepare('SELECT h.id FROM hives h JOIN apiaries a ON h.apiary_id = a.id WHERE h.id = ? AND a.user_id = ?').get(hiveId, userId);
+}
+function ownsVisit(visitId, userId) {
+  return db.prepare('SELECT v.id FROM visits v JOIN apiaries a ON v.apiary_id = a.id WHERE v.id = ? AND a.user_id = ?').get(visitId, userId);
+}
+function ownsFeeding(planId, userId) {
+  return db.prepare('SELECT fp.id FROM feeding_plans fp JOIN apiaries a ON fp.apiary_id = a.id WHERE fp.id = ? AND a.user_id = ?').get(planId, userId);
+}
+
 // ─── Helper: apiary ownership check ──────────────────────────────────────────
 
 function getOwnedApiary(apiaryId, userId) {
@@ -1818,10 +1830,12 @@ app.get('/api/hives/:id', authMiddleware, (req, res) => {
   res.json({ ...hive, code: hive.unique_code, floors, queen_present: lastVisit?.queen_present ?? 1, queen_age_months: lastVisit?.queen_age_months });
 });
 app.get('/api/hives/:id/floors', authMiddleware, (req, res) => {
+  if (!ownsHive(req.params.id, req.user.id)) return res.status(404).json({ error: 'Kosherja nuk gjendet' });
   const floors = db.prepare('SELECT * FROM hive_floors WHERE hive_id = ? ORDER BY floor_number').all(req.params.id);
   res.json(floors);
 });
 app.put('/api/hives/:hiveId/floors/:floorId', authMiddleware, (req, res) => {
+  if (!ownsHive(req.params.hiveId, req.user.id)) return res.status(404).json({ error: 'Kosherja nuk gjendet' });
   const { frames_bees, frames_eggs, frames_honey, frames_new } = req.body;
   db.prepare('UPDATE hive_floors SET frames_bees = ?, frames_eggs = ?, frames_honey = ?, frames_new = ? WHERE id = ? AND hive_id = ?')
     .run(frames_bees ?? 0, frames_eggs ?? 0, frames_honey ?? 0, frames_new ?? 0, req.params.floorId, req.params.hiveId);
@@ -1838,6 +1852,7 @@ app.delete('/api/hives/:hiveId/floors/:floorId', authMiddleware, (req, res) => {
   res.json({ message: 'Kati u fshi' });
 });
 app.get('/api/hives/:id/visits', authMiddleware, (req, res) => {
+  if (!ownsHive(req.params.id, req.user.id)) return res.status(404).json({ error: 'Kosherja nuk gjendet' });
   const visits = db.prepare('SELECT v.*, hvd.queen_present, hvd.queen_age_months, hvd.status, hvd.notes as hive_notes FROM visits v LEFT JOIN hive_visit_data hvd ON hvd.visit_id = v.id AND hvd.hive_id = ? WHERE v.apiary_id IN (SELECT apiary_id FROM hives WHERE id = ?) ORDER BY v.visit_date DESC LIMIT 20').all(req.params.id, req.params.id);
   res.json(visits);
 });
@@ -1864,11 +1879,24 @@ app.post('/api/visits', authMiddleware, (req, res) => {
     const visitId = result.lastInsertRowid;
     if (hive_data && Array.isArray(hive_data)) {
       hive_data.forEach(hd => {
-        const hvd = db.prepare('INSERT INTO hive_visit_data (visit_id, hive_id, queen_present, queen_age_months, status, notes) VALUES (?, ?, ?, ?, ?, ?)').run(visitId, hd.hive_id, hd.queen_present ?? 1, hd.queen_age_months || null, hd.status || 'good', hd.notes || null);
-        if (hd.status) db.prepare('UPDATE hives SET status = ? WHERE id = ?').run(hd.status, hd.hive_id);
+        // vetëm kosheret e këtij kopshti
+        const own = db.prepare('SELECT id FROM hives WHERE id = ? AND apiary_id = ?').get(hd.hive_id, apiary.id);
+        if (!own) return;
+        const qp = hd.queen_present === undefined ? 1 : (hd.queen_present ? 1 : 0);
+        const hvd = db.prepare('INSERT INTO hive_visit_data (visit_id, hive_id, queen_present, queen_age_months, status, notes) VALUES (?, ?, ?, ?, ?, ?)').run(visitId, hd.hive_id, qp, hd.queen_age_months || null, hd.status || 'good', hd.notes || null);
+        if (visitStatus2 === 'completed') {
+          db.prepare('UPDATE hives SET status = COALESCE(?, status), queen_present = ?, queen_age_months = ?, notes = COALESCE(?, notes) WHERE id = ?')
+            .run(hd.status || null, qp, qp ? (hd.queen_age_months || null) : null, hd.notes || null, hd.hive_id);
+        }
         if (hd.floors && Array.isArray(hd.floors)) {
           hd.floors.forEach(f => {
-            db.prepare('INSERT INTO hive_floor_visit_data (hive_visit_data_id, floor_id, frames_bees, frames_eggs, frames_honey, frames_new) VALUES (?, ?, ?, ?, ?, ?)').run(hvd.lastInsertRowid, f.floor_id, f.frames_bees ?? 0, f.frames_eggs ?? 0, f.frames_honey ?? 0, f.frames_new ?? 0);
+            const floor = db.prepare('SELECT id FROM hive_floors WHERE id = ? AND hive_id = ?').get(f.floor_id, hd.hive_id);
+            if (!floor) return;
+            const fr = [f.frames_bees ?? 0, f.frames_eggs ?? 0, f.frames_honey ?? 0, f.frames_new ?? 0].map(n => Math.max(0, Math.min(20, parseInt(n) || 0)));
+            db.prepare('INSERT INTO hive_floor_visit_data (hive_visit_data_id, floor_id, frames_bees, frames_eggs, frames_honey, frames_new) VALUES (?, ?, ?, ?, ?, ?)').run(hvd.lastInsertRowid, floor.id, ...fr);
+            if (visitStatus2 === 'completed') {
+              db.prepare('UPDATE hive_floors SET frames_bees = ?, frames_eggs = ?, frames_honey = ?, frames_new = ? WHERE id = ?').run(...fr, floor.id);
+            }
           });
         }
       });
@@ -1878,6 +1906,7 @@ app.post('/api/visits', authMiddleware, (req, res) => {
   res.status(201).json(createVisit());
 });
 app.put('/api/visits/:id', authMiddleware, (req, res) => {
+  if (!ownsVisit(req.params.id, req.user.id)) return res.status(404).json({ error: 'Vizita nuk gjendet' });
   const { notes, visit_date } = req.body;
   db.prepare('UPDATE visits SET notes = ?, visit_date = ? WHERE id = ?').run(notes || null, visit_date, req.params.id);
   res.json(db.prepare('SELECT * FROM visits WHERE id = ?').get(req.params.id));
@@ -1921,10 +1950,12 @@ app.delete('/api/notifications/:id', authMiddleware, (req, res) => {
 app.get('/api/feeding', authMiddleware, (req, res) => {
   const { apiary_id } = req.query;
   if (!apiary_id) return res.status(400).json({ error: 'apiary_id kërkohet' });
+  if (!getOwnedApiary(apiary_id, req.user.id)) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
   const plans = db.prepare('SELECT fp.*, COUNT(fph.id) as hive_count FROM feeding_plans fp LEFT JOIN feeding_plan_hives fph ON fph.feeding_plan_id = fp.id WHERE fp.apiary_id = ? GROUP BY fp.id ORDER BY fp.plan_date DESC').all(apiary_id);
   res.json(plans);
 });
 app.get('/api/feeding/:id', authMiddleware, (req, res) => {
+  if (!ownsFeeding(req.params.id, req.user.id)) return res.status(404).json({ error: 'Plani nuk gjendet' });
   const plan = db.prepare('SELECT * FROM feeding_plans WHERE id = ?').get(req.params.id);
   if (!plan) return res.status(404).json({ error: 'Plani nuk gjendet' });
   const hives = db.prepare('SELECT fph.*, h.unique_code as hive_code FROM feeding_plan_hives fph JOIN hives h ON fph.hive_id = h.id WHERE fph.feeding_plan_id = ?').all(plan.id);
@@ -1933,19 +1964,22 @@ app.get('/api/feeding/:id', authMiddleware, (req, res) => {
 app.post('/api/feeding', authMiddleware, (req, res) => {
   const { apiary_id, plan_date, description, hives } = req.body;
   if (!apiary_id || !plan_date) return res.status(400).json({ error: 'apiary_id dhe plan_date kërkohen' });
+  if (!getOwnedApiary(apiary_id, req.user.id)) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
   const result = db.prepare('INSERT INTO feeding_plans (apiary_id, plan_date, description) VALUES (?, ?, ?)').run(apiary_id, plan_date, description || null);
   const planId = result.lastInsertRowid;
   if (hives && Array.isArray(hives)) {
-    hives.forEach(h => db.prepare('INSERT INTO feeding_plan_hives (feeding_plan_id, hive_id, food_amount, medicine, notes) VALUES (?, ?, ?, ?, ?)').run(planId, h.hive_id, h.food_amount || null, h.medicine || null, h.notes || null));
+    hives.filter(h => db.prepare('SELECT id FROM hives WHERE id = ? AND apiary_id = ?').get(h.hive_id, apiary_id)).forEach(h => db.prepare('INSERT INTO feeding_plan_hives (feeding_plan_id, hive_id, food_amount, medicine, notes) VALUES (?, ?, ?, ?, ?)').run(planId, h.hive_id, h.food_amount || null, h.medicine || null, h.notes || null));
   }
   res.status(201).json(db.prepare('SELECT * FROM feeding_plans WHERE id = ?').get(planId));
 });
 app.put('/api/feeding/:id', authMiddleware, (req, res) => {
+  if (!ownsFeeding(req.params.id, req.user.id)) return res.status(404).json({ error: 'Plani nuk gjendet' });
   const { plan_date, description } = req.body;
   db.prepare('UPDATE feeding_plans SET plan_date = ?, description = ? WHERE id = ?').run(plan_date, description || null, req.params.id);
   res.json(db.prepare('SELECT * FROM feeding_plans WHERE id = ?').get(req.params.id));
 });
 app.delete('/api/feeding/:id', authMiddleware, (req, res) => {
+  if (!ownsFeeding(req.params.id, req.user.id)) return res.status(404).json({ error: 'Plani nuk gjendet' });
   db.prepare('DELETE FROM feeding_plans WHERE id = ?').run(req.params.id);
   res.json({ message: 'U fshi' });
 });

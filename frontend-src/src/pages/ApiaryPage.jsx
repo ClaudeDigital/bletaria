@@ -288,7 +288,7 @@ export default function ApiaryPage() {
                       {v.notes && <p>{v.notes}</p>}
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <Link to={`/apiary/${id}/visit`} className="btn btn-primary btn-sm">Regjistro</Link>
+                      <Link to={`/apiary/${id}/visit?plan=${v.id}`} className="btn btn-primary btn-sm">Regjistro</Link>
                       <button className="btn btn-ghost btn-sm btn-icon" onClick={() => cancelPlanned(v.id)} aria-label="Hiq vizitën"><X size={16} /></button>
                     </div>
                   </li>
