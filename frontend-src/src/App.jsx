@@ -31,6 +31,12 @@ function ProtectedRoute({ children, beekeeper = true }) {
   return children
 }
 
+// Admini s'ka pse ta shohë faqen e mbështetjes
+function NotForAdmin({ children }) {
+  const { isAdmin } = useAuth()
+  return isAdmin ? <Navigate to="/admin" replace /> : children
+}
+
 function AppRoutes() {
   const { isAuthenticated } = useAuth()
   return (
@@ -44,7 +50,7 @@ function AppRoutes() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
-          <Route path="/donate" element={<DonatePage />} />
+          <Route path="/donate" element={<NotForAdmin><DonatePage /></NotForAdmin>} />
           <Route path="/admin" element={<AdminPage />} />
 
           {/* Protected routes */}

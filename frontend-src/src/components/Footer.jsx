@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function Footer() {
+  const { isAdmin } = useAuth()
   return (
     <footer className="site-footer">
       <div className="container site-footer-inner">
@@ -8,7 +10,7 @@ export default function Footer() {
         <nav aria-label="Lidhje të fundit">
           <Link to="/community">Komuniteti</Link>
           <Link to="/marketplace">Tregu</Link>
-          <Link to="/donate">Mbështet</Link>
+          {!isAdmin && <Link to="/donate">Mbështet</Link>}
           <a href="mailto:info@bletariaime.al">Kontakt</a>
         </nav>
       </div>

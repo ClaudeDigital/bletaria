@@ -140,9 +140,11 @@ export default function Navbar() {
             <button className="icon-btn" onClick={toggleTheme} aria-label={isDark ? 'Kalo në pamjen e ditës' : 'Kalo në pamjen e natës'}>
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-            <Link to="/donate" className="icon-btn nav-desktop-only" aria-label="Mbështet platformën">
-              <Coffee size={20} />
-            </Link>
+            {!isAdmin && (
+              <Link to="/donate" className="icon-btn nav-desktop-only" aria-label="Mbështet platformën">
+                <Coffee size={20} />
+              </Link>
+            )}
 
             {isAuthenticated && <NotificationBell userId={user?.id} />}
 
@@ -166,7 +168,7 @@ export default function Navbar() {
                     {isAdmin
                       ? <Link to="/admin" onClick={() => setMenuOpen(false)}><BarChart3 size={18} /> Paneli i adminit</Link>
                       : <Link to="/dashboard" onClick={() => setMenuOpen(false)}><LayoutGrid size={18} /> Kopshtet e mia</Link>}
-                    <Link to="/donate" onClick={() => setMenuOpen(false)}><Coffee size={18} /> Mbështet platformën</Link>
+                    {!isAdmin && <Link to="/donate" onClick={() => setMenuOpen(false)}><Coffee size={18} /> Mbështet platformën</Link>}
                     <div className="sep" />
                     <button className="danger" onClick={handleLogout}><LogOut size={18} /> Dil</button>
                   </div>
