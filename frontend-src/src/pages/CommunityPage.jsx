@@ -1,6 +1,8 @@
 import PageLoader from '../components/PageLoader'
 import { useState, useEffect, useRef } from 'react'
+import { Heart, MessageCircle, SendHorizontal, Plus } from 'lucide-react'
 import { communityAPI } from '../api'
+import { fmtDate } from '../lib/format'
 import { useAuth } from '../context/AuthContext'
 
 const SAMPLE_POSTS = [
@@ -27,7 +29,7 @@ const SAMPLE_POSTS = [
   {
     id: 3,
     author: { name: 'Besnik Hoxha', avatar: 'B', location: 'Durrës' },
-    content: '🍯 Vendosa mjaltën e para të vitit! Luleshtrydhe dhe limon - aroma e jashtëzakonshme. 40 kg nga 8 koshere. Ky vit po fillon mirë!',
+    content: 'Vendosa mjaltën e para të vitit! Luleshtrydhe dhe limon - aroma e jashtëzakonshme. 40 kg nga 8 koshere. Ky vit po fillon mirë!',
     date: '2026-04-15T09:00:00Z',
     likes: 47,
     liked: true,
@@ -109,6 +111,7 @@ function PostCard({ post, onLike, onCommentAdded }) {
     const diff = Date.now() - new Date(dateStr).getTime()
     const h = Math.floor(diff / 3600000)
     const d = Math.floor(h / 24)
+    if (d > 6) return fmtDate(dateStr)
     if (d > 0) return `${d} ditë më parë`
     if (h > 0) return `${h} orë më parë`
     return 'Tani'
@@ -126,7 +129,7 @@ function PostCard({ post, onLike, onCommentAdded }) {
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{post.author?.name}</div>
               {post.author?.location && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>📍 {post.author.location}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{post.author.location}</div>
               )}
             </div>
           </div>
@@ -162,7 +165,7 @@ function PostCard({ post, onLike, onCommentAdded }) {
               transition: 'all 0.15s',
             }}
           >
-            {localLiked ? '❤️' : '🤍'} {localLikes}
+            <Heart size={17} fill={localLiked ? 'currentColor' : 'none'} /> {localLikes}
           </button>
 
           <button
@@ -182,7 +185,7 @@ function PostCard({ post, onLike, onCommentAdded }) {
               transition: 'all 0.15s',
             }}
           >
-            💬 {post.comment_count || 0} komente
+            <MessageCircle size={17} /> {post.comment_count || 0} komente
           </button>
         </div>
 
@@ -226,7 +229,7 @@ function PostCard({ post, onLike, onCommentAdded }) {
                   style={{ flex: 1, padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
                 />
                 <button type="submit" className="btn btn-primary btn-sm" disabled={submitting || !newComment.trim()}>
-                  {submitting ? '⏳' : '→'}
+                  <SendHorizontal size={18} />
                 </button>
               </form>
             )}
@@ -281,8 +284,8 @@ function AddPostModal({ onClose, onAdded }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <span className="modal-title">📝 Postim i Ri</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <span className="modal-title">Postim i Ri</span>
+          <button className="modal-close" onClick={onClose} aria-label="Mbyll">×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
@@ -298,14 +301,14 @@ function AddPostModal({ onClose, onAdded }) {
               rows={5}
               value={content}
               onChange={e => setContent(e.target.value)}
-              placeholder="Çfarë ndodh në kopshtin tënd? Ndaj eksperiencën tënde me komunitetin... 🐝"
+              placeholder="Çfarë ndodh në kopshtin tënd? Ndaj eksperiencën tënde me komunitetin... "
               autoFocus
             />
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Anulo</button>
             <button type="submit" className="btn btn-primary" disabled={loading || !content.trim()}>
-              {loading ? '⏳' : '📢 Posto'}
+              {loading ? 'Duke postuar…' : 'Posto'}
             </button>
           </div>
         </form>
@@ -351,14 +354,14 @@ export default function CommunityPage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h1 style={{ fontSize: '1.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              💬 Komuniteti
+            <h1 className="page-title">
+              Komuniteti
             </h1>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Ndaj eksperiencën tënde me bletarët e tjerë</p>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Pyet, trego si shkoi sezoni, ndihmo bletarët e tjerë.</p>
           </div>
           {user && (
             <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-              📝 Shto Postim
+              <Plus size={18} /> Shkruaj postim
             </button>
           )}
         </div>
@@ -377,7 +380,7 @@ export default function CommunityPage() {
 
             {posts.length === 0 && (
               <div className="empty-state">
-                <div className="empty-state-icon">💬</div>
+                <div className="empty-state-icon"></div>
                 <h3>Nuk ka postime ende</h3>
                 <p>Ji i pari që poston!</p>
               </div>
@@ -390,7 +393,7 @@ export default function CommunityPage() {
                   onClick={() => loadPosts(page + 1)}
                   disabled={loading}
                 >
-                  {loading ? '⏳ Duke ngarkuar...' : '⬇ Ngarko më shumë'}
+                  {loading ? 'Duke ngarkuar...' : '⬇ Ngarko më shumë'}
                 </button>
               </div>
             )}

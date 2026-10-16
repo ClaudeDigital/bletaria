@@ -37,12 +37,12 @@ function AdminLogin({ onLogin }) {
       <div style={{ width: '100%', maxWidth: '380px' }}>
         <div className="card">
           <div style={{ padding: '2rem 2rem 0', textAlign: 'center' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⚙️</div>
+            
             <h1 style={{ fontSize: '1.3rem', marginBottom: '0.2rem' }}>Admin Panel</h1>
             <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Bletaria Ime — Administrim</p>
           </div>
           <form onSubmit={handleSubmit} style={{ padding: '1.5rem 2rem 2rem' }}>
-            {error && <div className="alert alert-error">⚠️ {error}</div>}
+            {error && <div className="alert alert-error">{error}</div>}
             <div className="form-group">
               <label className="form-label">Emri i Përdoruesit</label>
               <input type="text" className="form-control" placeholder="admin" value={form.username}
@@ -54,11 +54,11 @@ function AdminLogin({ onLogin }) {
                 onChange={e => setForm(p => ({ ...p, password: e.target.value }))} />
             </div>
             <button type="submit" className="btn btn-primary w-full btn-lg" disabled={loading}>
-              {loading ? '⏳ Duke hyrë...' : '🔐 Hyr në Admin'}
+              {loading ? 'Duke hyrë...' : 'Hyr në Admin'}
             </button>
           </form>
           <div style={{ padding: '0 2rem 1.5rem', textAlign: 'center', fontSize: '0.85rem' }}>
-            <Link to="/login" style={{ color: 'var(--gold)', fontWeight: 600 }}>Hyr me llogarinë e adminit →</Link>
+            <Link to="/login" style={{ color: 'var(--gold)', fontWeight: 600 }}>Hyr me llogarinë e adminit</Link>
           </div>
         </div>
       </div>
@@ -101,7 +101,7 @@ function StatsTab() {
       .catch(() => setError('Statistikat nuk u ngarkuan.'))
   }, [])
 
-  if (error) return <div className="alert alert-error">⚠️ {error}</div>
+  if (error) return <div className="alert alert-error">{error}</div>
   if (!stats) return <PageLoader />
 
   const cards = [
@@ -123,7 +123,7 @@ function StatsTab() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
         {cards.map(c => (
           <div key={c.label} className="card card-body" style={{ padding: '1rem' }}>
-            <div style={{ fontSize: '1.9rem', fontWeight: 900, color: 'var(--gold-dark)', lineHeight: 1 }}>{c.value}</div>
+            <div className="stencil" style={{ fontSize: '2.2rem', lineHeight: 1 }}>{c.value}</div>
             <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '0.35rem' }}>{c.label}</div>
             {c.sub && <div style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: '0.15rem' }}>{c.sub}</div>}
           </div>
@@ -173,7 +173,7 @@ function StatsTab() {
               <div style={{ height: '10px', background: 'var(--surface)', borderRadius: '5px', overflow: 'hidden' }}>
                 <div style={{ width: `${r.hives / maxLoc * 100}%`, height: '100%', background: 'var(--green)' }} />
               </div>
-              <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}><strong style={{ color: 'var(--text)' }}>{r.hives}</strong> · {r.apiaries} {r.apiaries === 1 ? 'kopsht' : 'kopshte'}</span>
+              <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}><strong style={{ color: 'var(--text)' }}>{r.hives}</strong> koshere, {r.apiaries} {r.apiaries === 1 ? 'kopsht' : 'kopshte'}</span>
             </div>
           ))}
         </div>
@@ -194,7 +194,7 @@ function UsersTab() {
       .catch(() => setError('Regjistrimet nuk u ngarkuan.'))
   }, [])
 
-  if (error) return <div className="alert alert-error">⚠️ {error}</div>
+  if (error) return <div className="alert alert-error">{error}</div>
   if (!users) return <PageLoader />
 
   const q = search.trim().toLowerCase()
@@ -227,7 +227,7 @@ function UsersTab() {
                     {!u.active && <span className="badge badge-red" style={{ marginLeft: '0.5rem' }}>Joaktiv</span>}
                   </span>
                   <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {u.email} · regjistruar {fmtDate(u.created_at)}
+                    {u.email}, regjistruar më {fmtDate(u.created_at)}
                   </span>
                 </span>
                 <span style={{ textAlign: 'right', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
@@ -239,7 +239,7 @@ function UsersTab() {
               {isOpen && (
                 <div style={{ padding: '0.25rem 0.9rem 0.9rem', background: 'var(--surface)', fontSize: '0.84rem' }}>
                   <p style={{ color: 'var(--muted)', margin: '0.5rem 0' }}>
-                    Vizita e fundit: {fmtDate(u.last_visit)} · Postime: {u.post_count}
+                    Vizita e fundit: {fmtDate(u.last_visit)}. Postime: {u.post_count}.
                   </p>
                   {u.apiaries.length === 0 ? (
                     <p style={{ color: 'var(--muted)', margin: 0 }}>Nuk ka krijuar ende kopshte.</p>
@@ -306,7 +306,7 @@ export default function AdminPage() {
     <div className="page-content">
       <div className="container">
         <div style={{
-          background: 'linear-gradient(135deg, #1a0f00, #3d2206)',
+          background: 'var(--ink)',
           borderRadius: 'var(--radius)',
           padding: '1.1rem 1.25rem',
           marginBottom: '1.25rem',
@@ -319,7 +319,7 @@ export default function AdminPage() {
           <div>
             <h1 style={{ fontSize: '1.15rem', color: 'white', marginBottom: '0.1rem' }}>Paneli i Adminit</h1>
             <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.8rem', margin: 0 }}>
-              {admin.username} · vetëm shikim i statistikave dhe regjistrimeve
+              {admin.username}. Vetëm shikim i statistikave dhe regjistrimeve.
             </p>
           </div>
           <button onClick={handleLogout} className="btn btn-ghost btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>

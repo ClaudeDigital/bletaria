@@ -32,8 +32,9 @@ function ProtectedRoute({ children, beekeeper = true }) {
 }
 
 function AppRoutes() {
+  const { isAuthenticated } = useAuth()
   return (
-    <div className="page-layout">
+    <div className={`page-layout${isAuthenticated ? ' has-tabbar' : ''}`}>
       <Navbar />
       <main style={{ flex: 1 }}>
         <Routes>
@@ -71,11 +72,10 @@ function AppRoutes() {
 
           {/* Catch all */}
           <Route path="*" element={
-            <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-              <div style={{ fontSize: '5rem', marginBottom: '1rem' }}>🐝</div>
-              <h2 style={{ marginBottom: '0.5rem' }}>404 - Faqja nuk u gjet</h2>
-              <p style={{ marginBottom: '1.5rem' }}>Ky URL nuk ekziston.</p>
-              <a href="/" className="btn btn-primary">Kthehu në shtëpi</a>
+            <div className="container empty-state" style={{ padding: '80px 16px' }}>
+              <h2 className="page-title" style={{ marginBottom: 8 }}>Kjo faqe nuk ekziston</h2>
+              <p>Lidhja mund të jetë e vjetër ose e shkruar gabim.</p>
+              <a href="/" className="btn btn-primary">Shko te faqja kryesore</a>
             </div>
           } />
         </Routes>

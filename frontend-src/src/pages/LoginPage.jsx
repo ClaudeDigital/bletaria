@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Eye, EyeOff, BarChart3, ChevronRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api'
+import HiveStack from '../components/HiveStack'
+import { plural } from '../lib/format'
 
 function DemoAccounts({ onPick, busyId }) {
   const [accounts, setAccounts] = useState(null)
@@ -15,49 +18,37 @@ function DemoAccounts({ onPick, busyId }) {
   if (!accounts || accounts.length === 0) return null
 
   return (
-    <div className="card" style={{ marginBottom: '1rem' }}>
-      <div style={{ padding: '1.25rem 1.25rem 0.5rem' }}>
-        <h2 style={{ fontSize: '1.05rem', marginBottom: '0.2rem' }}>Hyr me një prekje</h2>
-        <p style={{ color: 'var(--muted)', fontSize: '0.82rem', margin: 0 }}>
-          Llogari demo — zgjidh kë do të provosh, pa fjalëkalim.
-        </p>
-      </div>
-      <div style={{ padding: '0.5rem 0.75rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+    <section className="auth-demo" aria-labelledby="demo-title">
+      <h2 id="demo-title">Provo pa fjalëkalim</h2>
+      <p>Llogari demo me të dhëna shembull. Prek njërën për të hyrë.</p>
+      <ul>
         {accounts.map(a => {
           const admin = a.role === 'admin'
-          const name = `${a.first_name} ${a.last_name}`.trim()
+          const name = admin ? 'Administratori' : `${a.first_name} ${a.last_name}`.trim()
+          const detail = admin
+            ? 'Statistikat dhe regjistrimet'
+            : `${plural(a.apiary_count, 'kopsht', 'kopshte')}, ${a.hive_count} koshere`
           return (
-            <button key={a.id} type="button" onClick={() => onPick(a)} disabled={!!busyId}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%',
-                padding: '0.7rem 0.75rem', textAlign: 'left', cursor: busyId ? 'wait' : 'pointer',
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font)', color: 'var(--text)',
-                opacity: busyId && busyId !== a.id ? 0.55 : 1, minHeight: '56px',
-              }}>
-              <span style={{
-                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                background: admin ? 'var(--wood, #8B5E3C)' : 'var(--gold)', color: 'white',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800,
-              }}>{admin ? 'A' : name.charAt(0)}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontWeight: 700, fontSize: '0.92rem' }}>
-                  {admin ? 'Administratori' : name}
-                </span>
-                <span style={{ display: 'block', fontSize: '0.76rem', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <li key={a.id}>
+              <button type="button" onClick={() => onPick(a)} disabled={!!busyId}
+                aria-label={`Hyr si ${name}`} data-busy={busyId === a.id || undefined}>
+                <span className="auth-demo-mark">
                   {admin
-                    ? 'Statistika dhe regjistrimet'
-                    : `${a.apiary_count} ${a.apiary_count === 1 ? 'kopsht' : 'kopshte'} · ${a.hive_count} koshere${a.locations ? ' · ' + a.locations : ''}`}
+                    ? <BarChart3 size={22} />
+                    : <HiveStack seed={a.id} floors={Math.min(4, a.apiary_count)} width={30} />}
                 </span>
-              </span>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--gold-dark, #c4841a)', flexShrink: 0 }}>
-                {busyId === a.id ? '…' : 'Hyr →'}
-              </span>
-            </button>
+                <span className="auth-demo-text">
+                  <strong>{name}</strong>
+                  <span>{detail}</span>
+                  {!admin && a.locations && <span className="auth-demo-loc">{a.locations.split(' · ').join(', ')}</span>}
+                </span>
+                <span className="auth-demo-go">{busyId === a.id ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> : <ChevronRight size={20} />}</span>
+              </button>
+            </li>
           )
         })}
-      </div>
-    </div>
+      </ul>
+    </section>
   )
 }
 
@@ -81,7 +72,7 @@ export default function LoginPage() {
     try {
       goHome(await demoLogin(account.id))
     } catch {
-      setError('Hyrja demo dështoi. Provo sërish.')
+      setError('Hyrja demo nuk funksionoi. Provo përsëri.')
       setDemoBusy(null)
     }
   }
@@ -89,7 +80,7 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.email || !form.password) {
-      setError('Plotëso të gjitha fushat.')
+      setError('Shkruaj email-in dhe fjalëkalimin.')
       return
     }
     setError('')
@@ -97,115 +88,93 @@ export default function LoginPage() {
     try {
       goHome(await login(form.email, form.password))
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Email ose fjalëkalim i gabuar.')
+      setError(err.response?.data?.error || 'Email-i ose fjalëkalimi nuk është i saktë.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{
-      minHeight: 'calc(100vh - 64px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem 1rem',
-      background: 'var(--surface)',
-    }}>
-      <div style={{ width: '100%', maxWidth: '420px' }}>
-        <DemoAccounts onPick={handleDemo} busyId={demoBusy} />
-        {/* Card */}
-        <div className="card">
-          <div style={{
-            padding: '2rem 2rem 0',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🍯</div>
-            <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Mirë se erdhe</h1>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Hyr në llogarinë tënde</p>
-          </div>
+    <div className="auth-page">
+      <style>{AUTH_CSS}</style>
+      <div className="container auth-grid">
+        <div className="auth-main">
+          <h1>Hyr</h1>
+          <p className="auth-sub">Vazhdo aty ku e le në vizitën e fundit.</p>
 
-          <form onSubmit={handleSubmit} style={{ padding: '1.75rem 2rem 2rem' }}>
-            {error && (
-              <div className="alert alert-error">
-                ⚠️ {error}
-              </div>
-            )}
+          <form onSubmit={handleSubmit} noValidate>
+            {error && <div className="alert alert-error" role="alert">{error}</div>}
 
             <div className="form-group">
-              <label className="form-label">📧 Email</label>
-              <input
-                type="email"
-                className="form-control"
-                placeholder="email@shembull.com"
-                value={form.email}
-                onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                
-              />
+              <label className="form-label" htmlFor="email">Email</label>
+              <input id="email" type="email" className="form-control" autoComplete="email"
+                inputMode="email" placeholder="emri@shembull.com"
+                value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
             </div>
 
             <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <label className="form-label" style={{ marginBottom: 0 }}>🔒 Fjalëkalimi</label>
-                <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: 'var(--gold)' }}>
-                  Harrova fjalëkalimin
-                </Link>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <label className="form-label" htmlFor="password">Fjalëkalimi</label>
+                <Link to="/forgot-password" style={{ fontSize: '.85rem', fontWeight: 600 }}>E harrove?</Link>
               </div>
               <div style={{ position: 'relative' }}>
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  className="form-control"
-                  placeholder="••••••••"
-                  value={form.password}
-                  onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                  style={{ paddingRight: '2.5rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  style={{
-                    position: 'absolute',
-                    right: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--muted)',
-                    fontSize: '1rem',
-                    padding: 0,
-                  }}
-                >
-                  {showPass ? '🙈' : '👁️'}
+                <input id="password" type={showPass ? 'text' : 'password'} className="form-control"
+                  autoComplete="current-password" style={{ paddingRight: 48 }}
+                  value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} />
+                <button type="button" className="icon-btn" onClick={() => setShowPass(s => !s)}
+                  aria-label={showPass ? 'Fshih fjalëkalimin' : 'Shfaq fjalëkalimin'}
+                  style={{ position: 'absolute', right: 3, top: 3 }}>
+                  {showPass ? <EyeOff size={19} /> : <Eye size={19} />}
                 </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary w-full btn-lg"
-              disabled={loading}
-              style={{ marginTop: '0.5rem' }}
-            >
-              {loading ? '⏳ Duke hyrë...' : '🐝 Hyr tani'}
+            <button type="submit" className="btn btn-primary btn-lg w-full" disabled={loading}>
+              {loading ? 'Duke hyrë…' : 'Hyr'}
             </button>
           </form>
 
-          <div style={{
-            padding: '1.25rem 2rem',
-            borderTop: '1px solid var(--border)',
-            textAlign: 'center',
-          }}>
-            <span style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
-              Nuk ke llogari?{' '}
-            </span>
-            <Link to="/register" style={{ color: 'var(--gold)', fontWeight: 600, fontSize: '0.9rem' }}>
-              Regjistrohu falas
-            </Link>
-          </div>
+          <p className="auth-switch">
+            S'ke llogari? <Link to="/register">Krijo një falas</Link>
+          </p>
         </div>
 
+        <DemoAccounts onPick={handleDemo} busyId={demoBusy} />
       </div>
     </div>
   )
 }
+
+export const AUTH_CSS = `
+.auth-page { padding: clamp(28px, 6vw, 72px) 0 72px; }
+.auth-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 420px); gap: clamp(32px, 7vw, 96px); align-items: start; }
+.auth-main h1 { font-size: clamp(2.4rem, 7vw, 3.4rem); line-height: 1; }
+.auth-sub { margin: 10px 0 28px; }
+.auth-switch { margin-top: 20px; font-size: .95rem; }
+.auth-switch a { font-weight: 700; }
+
+.auth-demo { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 22px 18px 12px; }
+.auth-demo h2 { font-size: 1.15rem; padding: 0 4px; }
+.auth-demo > p { font-size: .9rem; margin: 4px 4px 14px; }
+.auth-demo ul { list-style: none; }
+.auth-demo li + li { border-top: 1px solid var(--line); }
+.auth-demo button {
+  width: 100%; display: flex; align-items: center; gap: 14px;
+  padding: 12px 6px; min-height: 64px;
+  background: none; border: none; border-radius: 10px;
+  font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+}
+.auth-demo button:hover:not(:disabled) { background: var(--sunken); }
+.auth-demo button:disabled:not([data-busy]) { opacity: .5; }
+.auth-demo-mark { width: 40px; display: flex; justify-content: center; color: var(--ink); flex-shrink: 0; }
+.auth-demo-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.auth-demo-text strong { font-weight: 720; }
+.auth-demo-text span { font-size: .85rem; color: var(--ink-2); }
+.auth-demo-text .auth-demo-loc { font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-demo-go { color: var(--ink-2); display: flex; }
+
+@media (max-width: 820px) {
+  .auth-grid { grid-template-columns: 1fr; }
+  .auth-demo { order: -1; }
+}
+`

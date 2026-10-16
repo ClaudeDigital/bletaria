@@ -1,17 +1,19 @@
 import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
+import { Plus } from 'lucide-react'
 import { marketplaceAPI } from '../api'
+import { fmtDate } from '../lib/format'
 import { useAuth } from '../context/AuthContext'
 
 const CATEGORIES = [
-  { value: '', label: '🏷 Të gjitha' },
-  { value: 'mjaltë', label: '🍯 Mjaltë' },
-  { value: 'qumësht bletësh', label: '🍶 Qumësht Bletësh' },
-  { value: 'koshere', label: '🏠 Koshere' },
-  { value: 'pajisje', label: '🔧 Pajisje' },
-  { value: 'ilaçe', label: '💊 Ilaçe' },
-  { value: 'mbretëresha', label: '👑 Mbretëresha' },
-  { value: 'tjera', label: '📦 Tjera' },
+  { value: '', label: 'Të gjitha' },
+  { value: 'mjaltë', label: 'Mjaltë' },
+  { value: 'qumësht bletësh', label: 'Qumësht Bletësh' },
+  { value: 'koshere', label: 'Koshere' },
+  { value: 'pajisje', label: 'Pajisje' },
+  { value: 'ilaçe', label: 'Ilaçe' },
+  { value: 'mbretëresha', label: 'Mbretëresha' },
+  { value: 'tjera', label: 'Tjera' },
 ]
 
 const SAMPLE_LISTINGS = [
@@ -78,14 +80,14 @@ const SAMPLE_LISTINGS = [
 ]
 
 const CATEGORY_ICONS = {
-  'mjaltë': '🍯',
-  'qumësht bletësh': '🍶',
-  'koshere': '🏠',
-  'pajisje': '🔧',
-  'ilaçe': '💊',
-  'mbretëresha': '👑',
-  'nënmbretëresha': '👑',
-  'tjera': '📦',
+  'mjaltë': '',
+  'qumësht bletësh': '',
+  'koshere': '',
+  'pajisje': '',
+  'ilaçe': '',
+  'mbretëresha': '',
+  'nënmbretëresha': '',
+  'tjera': '',
 }
 
 function ListingCard({ listing, onContact }) {
@@ -96,13 +98,12 @@ function ListingCard({ listing, onContact }) {
       display: 'flex',
       flexDirection: 'column',
     }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px var(--shadow-md)' }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '' }}
     >
       {/* Image placeholder */}
       <div style={{
-        height: '150px',
-        background: 'linear-gradient(135deg, var(--surface), var(--border))',
+        height: listing.image ? '170px' : 'auto',
+        padding: listing.image ? 0 : '16px 20px 0',
+        background: listing.image ? 'var(--sunken)' : 'transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -111,20 +112,21 @@ function ListingCard({ listing, onContact }) {
       }}>
         {listing.image
           ? <img src={listing.image} alt={listing.title} style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', inset: 0 }} />
-          : (CATEGORY_ICONS[listing.category] || '📦')
+          : null
         }
         <span style={{
-          position: 'absolute',
+          position: listing.image ? 'absolute' : 'static',
           top: '0.5rem',
           right: '0.5rem',
-          background: 'rgba(0,0,0,0.6)',
-          color: 'white',
+          marginRight: 'auto',
+          background: listing.image ? 'rgba(14,19,16,0.7)' : 'var(--wax)',
+          color: listing.image ? 'white' : 'var(--honey-deep)',
           padding: '0.2rem 0.5rem',
           borderRadius: '20px',
           fontSize: '0.72rem',
           fontWeight: 600,
         }}>
-          {CATEGORY_ICONS[listing.category]} {listing.category}
+          {listing.category}
         </span>
       </div>
 
@@ -147,11 +149,11 @@ function ListingCard({ listing, onContact }) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-            👤 {listing.seller.name}
-            {listing.seller.location && ` · 📍 ${listing.seller.location}`}
+            {listing.seller.name}
+            {listing.seller.location && ` · ${listing.seller.location}`}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>
-            {new Date(listing.date).toLocaleDateString('sq-AL')}
+            {fmtDate(listing.date)}
           </span>
         </div>
 
@@ -159,7 +161,7 @@ function ListingCard({ listing, onContact }) {
           className="btn btn-primary w-full btn-sm"
           onClick={() => onContact(listing)}
         >
-          📞 Kontakto Shitësin
+          Kontakto Shitësin
         </button>
       </div>
     </div>
@@ -208,25 +210,25 @@ function AddListingModal({ onClose, onAdded }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <span className="modal-title">🛒 Shto Listim të Ri</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <span className="modal-title">Listim i ri</span>
+          <button className="modal-close" onClick={onClose} aria-label="Mbyll">×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             {error && <div className="alert alert-error">{error}</div>}
             <div className="form-group">
-              <label className="form-label">📝 Titulli *</label>
+              <label className="form-label">Titulli *</label>
               <input type="text" className="form-control" placeholder="p.sh. Mjaltë Luleshtrydhe 500g"
                 value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} autoFocus />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
-                <label className="form-label">💶 Çmimi (€) *</label>
+                <label className="form-label">Çmimi (€) *</label>
                 <input type="number" className="form-control" placeholder="0.00" min="0" step="0.5"
                   value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} />
               </div>
               <div className="form-group">
-                <label className="form-label">🏷 Kategoria</label>
+                <label className="form-label">Kategoria</label>
                 <select className="form-control" value={form.category}
                   onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
                   {CATEGORIES.filter(c => c.value).map(c => (
@@ -236,13 +238,13 @@ function AddListingModal({ onClose, onAdded }) {
               </div>
             </div>
             <div className="form-group">
-              <label className="form-label">📋 Përshkrimi</label>
+              <label className="form-label">Përshkrimi</label>
               <textarea className="form-control" rows={4} value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 placeholder="Përshkruaj produktin tënd..." />
             </div>
             <div className="form-group">
-              <label className="form-label">📱 Numri i Telefonit (për thirrje direkte)</label>
+              <label className="form-label">Numri i Telefonit (për thirrje direkte)</label>
               <input type="tel" className="form-control" placeholder="+383 4X XXX XXX"
                 value={form.contact} onChange={e => setForm(p => ({ ...p, contact: e.target.value }))} />
             </div>
@@ -250,7 +252,7 @@ function AddListingModal({ onClose, onAdded }) {
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Anulo</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? '⏳' : '🛒 Shto Listim'}
+              {loading ? 'Duke shtuar…' : 'Shto listimin'}
             </button>
           </div>
         </form>
@@ -264,12 +266,12 @@ function ContactModal({ listing, onClose }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: '400px' }}>
         <div className="modal-header">
-          <span className="modal-title">📞 Kontakto Shitësin</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <span className="modal-title">Kontakto Shitësin</span>
+          <button className="modal-close" onClick={onClose} aria-label="Mbyll">×</button>
         </div>
         <div className="modal-body">
           <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{CATEGORY_ICONS[listing.category] || '📦'}</div>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{CATEGORY_ICONS[listing.category] || ''}</div>
             <h3 style={{ fontSize: '1rem', marginBottom: '0.25rem' }}>{listing.title}</h3>
             <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--gold-dark)' }}>€{listing.price}</span>
           </div>
@@ -277,16 +279,16 @@ function ContactModal({ listing, onClose }) {
             <div style={{ marginBottom: '0.75rem' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginBottom: '0.25rem' }}>SHITËSI</div>
               <div style={{ fontWeight: 600 }}>{listing.seller?.name}</div>
-              {listing.seller?.location && <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>📍 {listing.seller.location}</div>}
+              {listing.seller?.location && <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{listing.seller.location}</div>}
             </div>
             {listing.contact_phone && (
               <div style={{ marginBottom: '0.5rem' }}>
-                <a href={`tel:${listing.contact_phone}`} className="btn btn-green w-full">📱 {listing.contact_phone}</a>
+                <a href={`tel:${listing.contact_phone}`} className="btn btn-green w-full">{listing.contact_phone}</a>
               </div>
             )}
             {listing.contact_email && (
               <a href={`mailto:${listing.contact_email}?subject=Pyetje për: ${listing.title}`} className="btn btn-ghost w-full">
-                📧 {listing.contact_email}
+                {listing.contact_email}
               </a>
             )}
             {!listing.contact_phone && !listing.contact_email && (
@@ -347,7 +349,7 @@ export default function MarketplacePage() {
           </div>
           {user && (
             <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-              + Shto Listim
+              <Plus size={18} /> Shto listim
             </button>
           )}
         </div>
@@ -368,7 +370,7 @@ export default function MarketplacePage() {
             <input
               type="text"
               className="form-control"
-              placeholder="🔍 Kërko produkte..."
+              placeholder="Kërko produkte..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -386,7 +388,7 @@ export default function MarketplacePage() {
             <input
               type="number"
               className="form-control"
-              placeholder="💶 Çmimi max €"
+              placeholder="Çmimi max €"
               value={maxPrice}
               onChange={e => setMaxPrice(e.target.value)}
               min="0"
@@ -398,7 +400,7 @@ export default function MarketplacePage() {
               className="btn btn-ghost btn-sm"
               onClick={() => { setSearch(''); setCategory(''); setMaxPrice('') }}
             >
-              ✕ Pastro filtrat
+              Pastro filtrat
             </button>
           )}
         </div>
@@ -418,7 +420,7 @@ export default function MarketplacePage() {
                 padding: '0.35rem 0.85rem',
                 border: `1.5px solid ${category === c.value ? 'var(--gold)' : 'var(--border)'}`,
                 borderRadius: '20px',
-                background: category === c.value ? 'rgba(245,166,35,0.1)' : 'var(--card)',
+                background: category === c.value ? 'rgba(227,162,26,0.1)' : 'var(--card)',
                 cursor: 'pointer',
                 fontSize: '0.82rem',
                 fontWeight: 600,
@@ -434,7 +436,7 @@ export default function MarketplacePage() {
           <PageLoader />
         ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🛒</div>
+            <div className="empty-state-icon"></div>
             <h3>Nuk u gjetën lista</h3>
             <p>Provo të ndryshosh filtrat ose shto listimin tënd të parë!</p>
           </div>

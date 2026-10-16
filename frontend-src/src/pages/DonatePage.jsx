@@ -13,7 +13,7 @@ function CoffeeCupSVG() {
 export default function DonatePage() {
   const methods = [
     {
-      icon: '🏦',
+      icon: '',
       title: 'Transfertë Bankare',
       details: [
         { label: 'Banka', value: 'Banka Ekonomike' },
@@ -22,7 +22,7 @@ export default function DonatePage() {
       ],
     },
     {
-      icon: '💳',
+      icon: '',
       title: 'PayPal',
       details: [
         { label: 'Email', value: 'donate@bletariaime.com' },
@@ -51,15 +51,15 @@ export default function DonatePage() {
           <div style={{
             width: '80px', height: '80px',
             borderRadius: '50%',
-            background: 'rgba(245,166,35,0.1)',
-            border: '1px solid rgba(245,166,35,0.2)',
+            background: 'rgba(227,162,26,0.1)',
+            border: '1px solid rgba(227,162,26,0.2)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 1.25rem',
           }}>
             <CoffeeCupSVG />
           </div>
 
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--gold)' }}>
+          <h1 style={{ fontSize: 'clamp(2rem, 6vw, 2.8rem)', fontWeight: 820, marginBottom: '0.75rem', color: 'var(--ink)' }}>
             Mbështet me një Kafe
           </h1>
           <p style={{ fontSize: '1.05rem', color: 'var(--muted)', maxWidth: '500px', margin: '0 auto 1.5rem', lineHeight: 1.7 }}>
@@ -69,9 +69,9 @@ export default function DonatePage() {
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
             {['Hosting', 'Zhvillim', 'Aplikacioni', 'AI Asistent'].map(tag => (
               <span key={tag} style={{
-                background: 'rgba(245,166,35,0.08)', color: 'var(--gold)',
+                background: 'rgba(227,162,26,0.08)', color: 'var(--gold)',
                 padding: '0.3rem 0.8rem', borderRadius: '20px',
-                fontSize: '0.82rem', fontWeight: 600, border: '1px solid rgba(245,166,35,0.2)',
+                fontSize: '0.82rem', fontWeight: 600, border: '1px solid rgba(227,162,26,0.2)',
               }}>{tag}</span>
             ))}
           </div>
@@ -89,7 +89,7 @@ export default function DonatePage() {
                 fontWeight: 700,
                 fontSize: '1rem',
                 color: 'var(--gold)',
-                background: 'rgba(245,166,35,0.07)',
+                background: 'rgba(227,162,26,0.07)',
                 cursor: 'default',
               }}>€{a}</div>
             ))}
@@ -122,7 +122,7 @@ export default function DonatePage() {
               {m.link && (
                 <a href={m.link} target="_blank" rel="noopener noreferrer"
                   className="btn btn-primary btn-sm" style={{ marginTop: '0.85rem', display: 'inline-flex' }}>
-                  {m.linkLabel} →
+                  {m.linkLabel}
                 </a>
               )}
             </div>
@@ -132,8 +132,8 @@ export default function DonatePage() {
         {/* Thank you */}
         <div style={{
           textAlign: 'center', padding: '2rem',
-          background: 'rgba(245,166,35,0.05)',
-          border: '1px solid rgba(245,166,35,0.15)',
+          background: 'rgba(227,162,26,0.05)',
+          border: '1px solid rgba(227,162,26,0.15)',
           borderRadius: 'var(--radius)', marginBottom: '3rem',
         }}>
           <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>Faleminderit për mbështetjen!</h3>

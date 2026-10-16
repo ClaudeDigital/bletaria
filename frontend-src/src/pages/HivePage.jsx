@@ -2,11 +2,13 @@ import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { hiveAPI } from '../api'
+import HiveStack from '../components/HiveStack'
+import { fmtDate } from '../lib/format'
 
 const STATUS_CONFIG = {
-  good:    { color: '#4A7C59', label: 'Mirë',    emoji: '✅' },
-  problem: { color: '#F5A623', label: 'Problem', emoji: '⚠️' },
-  dead:    { color: '#C0392B', label: 'Vdekur',  emoji: '💀' },
+  good:    { color: '#4A7C59', label: 'Mirë',    emoji: '' },
+  problem: { color: '#F5A623', label: 'Problem', emoji: '' },
+  dead:    { color: '#C0392B', label: 'Vdekur',  emoji: '' },
   empty:   { color: '#E8E8E8', label: 'Bosh',    emoji: '⬜' },
 }
 
@@ -37,22 +39,22 @@ function AddFloorModal({ hiveId, onClose, onAdded }) {
   }
 
   const intFields = [
-    { key: 'frames_bees', label: '🐝 Korniza me bletë' },
-    { key: 'frames_eggs', label: '🥚 Korniza me vezë' },
-    { key: 'frames_honey', label: '🍯 Korniza me mjaltë' },
-    { key: 'frames_new', label: '🆕 Korniza të reja' },
+    { key: 'frames_bees', label: 'Korniza me bletë' },
+    { key: 'frames_eggs', label: 'Korniza me vezë' },
+    { key: 'frames_honey', label: 'Korniza me mjaltë' },
+    { key: 'frames_new', label: 'Korniza të reja' },
   ]
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <span className="modal-title">➕ Shto Kat</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <span className="modal-title">Shto Kat</span>
+          <button className="modal-close" onClick={onClose} aria-label="Mbyll">×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-error">⚠️ {error}</div>}
+            {error && <div className="alert alert-error">{error}</div>}
             <div className="form-group">
               <label className="form-label">Numri i Katit</label>
               <input type="number" className="form-control" min="1" max="20" value={form.floor_number}
@@ -69,7 +71,7 @@ function AddFloorModal({ hiveId, onClose, onAdded }) {
               ))}
             </div>
             <div className="form-group">
-              <label className="form-label">📝 Shënime</label>
+              <label className="form-label">Shënime</label>
               <textarea className="form-control" rows={2} value={form.notes}
                 onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
             </div>
@@ -77,7 +79,7 @@ function AddFloorModal({ hiveId, onClose, onAdded }) {
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Anulo</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? '⏳' : '➕ Shto'}
+              {loading ? 'Duke shtuar…' : 'Shto'}
             </button>
           </div>
         </form>
@@ -126,12 +128,12 @@ function FloorAccordion({ floor, hiveId, onUpdated, onDeleted }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontWeight: 700, color: 'var(--gold)' }}>Kati {floor.floor_number}</span>
-          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--muted)' }}>
-            <span>🐝 {floor.frames_bees}</span>
-            <span>🥚 {floor.frames_eggs}</span>
-            <span>🍯 {floor.frames_honey}</span>
-            <span>🆕 {floor.frames_new}</span>
+          <span style={{ fontWeight: 750, color: 'var(--ink)', whiteSpace: 'nowrap' }}>Kati {floor.floor_number}</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 0.9rem', fontSize: '0.8rem', color: 'var(--muted)' }}>
+            <span><strong style={{ color: 'var(--ink)' }}>{floor.frames_bees}</strong> bletë</span>
+            <span><strong style={{ color: 'var(--ink)' }}>{floor.frames_eggs}</strong> vezë</span>
+            <span><strong style={{ color: 'var(--ink)' }}>{floor.frames_honey}</strong> mjaltë</span>
+            <span><strong style={{ color: 'var(--ink)' }}>{floor.frames_new}</strong> të reja</span>
           </div>
         </div>
         <span style={{ color: 'var(--muted)', fontSize: '0.85rem', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none' }}>▼</span>
@@ -144,10 +146,10 @@ function FloorAccordion({ floor, hiveId, onUpdated, onDeleted }) {
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '0.75rem' }}>
                 {[
-                  { key: 'frames_bees', label: '🐝 Bletë' },
-                  { key: 'frames_eggs', label: '🥚 Vezë' },
-                  { key: 'frames_honey', label: '🍯 Mjaltë' },
-                  { key: 'frames_new', label: '🆕 Të reja' },
+                  { key: 'frames_bees', label: 'Bletë' },
+                  { key: 'frames_eggs', label: 'Vezë' },
+                  { key: 'frames_honey', label: 'Mjaltë' },
+                  { key: 'frames_new', label: 'Të reja' },
                 ].map(f => (
                   <div key={f.key}>
                     <label style={{ fontSize: '0.72rem', color: 'var(--muted)', display: 'block', marginBottom: '0.25rem' }}>{f.label}</label>
@@ -165,7 +167,7 @@ function FloorAccordion({ floor, hiveId, onUpdated, onDeleted }) {
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>Anulo</button>
                 <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
-                  {saving ? '⏳' : '💾 Ruaj'}
+                  {saving ? 'Duke ruajtur…' : 'Ruaj'}
                 </button>
               </div>
             </div>
@@ -173,10 +175,10 @@ function FloorAccordion({ floor, hiveId, onUpdated, onDeleted }) {
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 {[
-                  { label: '🐝 Korniza me bletë', value: floor.frames_bees },
-                  { label: '🥚 Korniza me vezë', value: floor.frames_eggs },
-                  { label: '🍯 Korniza me mjaltë', value: floor.frames_honey },
-                  { label: '🆕 Korniza të reja', value: floor.frames_new },
+                  { label: 'Korniza me bletë', value: floor.frames_bees },
+                  { label: 'Korniza me vezë', value: floor.frames_eggs },
+                  { label: 'Korniza me mjaltë', value: floor.frames_honey },
+                  { label: 'Korniza të reja', value: floor.frames_new },
                 ].map(item => (
                   <div key={item.label} style={{ textAlign: 'center', background: 'var(--card)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
                     <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--gold)' }}>{item.value}</div>
@@ -185,11 +187,11 @@ function FloorAccordion({ floor, hiveId, onUpdated, onDeleted }) {
                 ))}
               </div>
               {floor.notes && (
-                <p style={{ fontSize: '0.82rem', color: 'var(--muted)', marginBottom: '0.75rem' }}>📝 {floor.notes}</p>
+                <p style={{ fontSize: '0.82rem', color: 'var(--muted)', marginBottom: '0.75rem' }}>{floor.notes}</p>
               )}
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                <button className="btn btn-danger btn-sm" onClick={handleDelete}>🗑</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>✏️ Edito</button>
+                <button className="btn btn-danger btn-sm" onClick={handleDelete}>Fshi katin</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edito</button>
               </div>
             </div>
           )}
@@ -240,32 +242,20 @@ export default function HivePage() {
       <div className="container" style={{ maxWidth: '800px' }}>
         {/* Breadcrumb */}
         <nav className="breadcrumb">
-          <Link to="/dashboard">🏠 Dashboard</Link>
-          <span className="breadcrumb-sep">›</span>
-          {hive?.apiary_id && <Link to={`/apiary/${hive.apiary_id}`}>🏡 Kopsht</Link>}
-          {hive?.apiary_id && <span className="breadcrumb-sep">›</span>}
-          <span>🐝 {hive?.code}</span>
+          <Link to="/dashboard">Kopshtet</Link>
+          <span className="breadcrumb-sep">/</span>
+          {hive?.apiary_id && <Link to={`/apiary/${hive.apiary_id}`}>Kopshti</Link>}
+          {hive?.apiary_id && <span className="breadcrumb-sep">/</span>}
+          <span>{hive?.code}</span>
         </nav>
 
         {/* Hive Header */}
         <div className="card card-body" style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: 'var(--radius)',
-                background: hive.status === 'empty' ? '#E8E8E8' : st.color,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.75rem',
-                flexShrink: 0,
-              }}>
-                🐝
-              </div>
+              <HiveStack seed={hive.id} floors={floors?.length || 1} status={hive.status} queenless={!hive.queen_present} width={56} />
               <div>
-                <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Koshère {hive.code}</h1>
+                <h1 className="page-title" style={{ marginBottom: '0.35rem' }}>Kosherja <span className="stencil">{hive.position_row}-{hive.position_col}</span></h1>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{
                     padding: '0.25rem 0.75rem',
@@ -275,14 +265,14 @@ export default function HivePage() {
                     background: `${st.color}20`,
                     color: hive.status === 'empty' ? 'var(--muted)' : st.color,
                   }}>
-                    {st.emoji} {st.label}
+                    {st.label}
                   </span>
                   <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
-                    {hive.queen_present ? '👑 Mbretëresha e pranishme' : '⚠️ Pa mbretëreshë'}
+                    {hive.queen_present ? 'Mbretëresha e pranishme' : 'Pa mbretëreshë'}
                   </span>
                   {hive.queen_age_months && (
                     <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-                      · Mosha: {hive.queen_age_months} muaj
+                      {hive.queen_age_months} muajshe
                     </span>
                   )}
                 </div>
@@ -292,7 +282,7 @@ export default function HivePage() {
 
           {hive.notes && (
             <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'var(--surface)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', color: 'var(--muted)' }}>
-              📝 {hive.notes}
+              {hive.notes}
             </div>
           )}
         </div>
@@ -300,18 +290,18 @@ export default function HivePage() {
         {/* Floors Section */}
         <div className="section">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h2 className="section-title" style={{ marginBottom: 0 }}>🏗 Katet ({floors.length})</h2>
+            <h2 className="section-title" style={{ marginBottom: 0 }}>Katet ({floors.length})</h2>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddFloor(true)}>
-              + Shto Kat
+              + Shto kat
             </button>
           </div>
 
           {floors.length === 0 ? (
             <div className="empty-state" style={{ padding: '2rem' }}>
-              <div className="empty-state-icon" style={{ fontSize: '2.5rem' }}>🏗</div>
+              <div className="empty-state-icon" style={{ fontSize: '2.5rem' }}></div>
               <h3>Nuk ka kate</h3>
               <p style={{ marginBottom: '1rem' }}>Shto katin e parë të kosheres</p>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowAddFloor(true)}>+ Shto Kat</button>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowAddFloor(true)}>+ Shto kat</button>
             </div>
           ) : (
             <div>
@@ -330,7 +320,7 @@ export default function HivePage() {
 
         {/* Visit History */}
         <div className="section">
-          <h2 className="section-title">📅 Vizitat e Fundit</h2>
+          <h2 className="section-title">Vizitat e fundit</h2>
           {visits.length === 0 ? (
             <div className="empty-state" style={{ padding: '1.5rem' }}>
               <p>Nuk ka vizita të regjistruara ende.</p>
@@ -341,7 +331,7 @@ export default function HivePage() {
                 <div key={v.id} className="card card-body" style={{ padding: '0.85rem 1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                      📅 {v.visit_date ? new Date(v.visit_date).toLocaleDateString('sq-AL') : '—'}
+                      {fmtDate(v.visit_date)}
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       {v.status && (

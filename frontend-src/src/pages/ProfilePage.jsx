@@ -3,17 +3,17 @@ import { useAuth } from '../context/AuthContext'
 import { profileAPI, apiaryAPI } from '../api'
 
 const EXPERIENCE_LABELS = {
-  fillestar: '🌱 Fillestar',
-  mesem: '🌿 Mesatar',
-  ekspert: '🌳 Ekspert',
-  profesional: '🏆 Profesionist',
+  fillestar: 'Fillestar',
+  mesem: 'Mesatar',
+  ekspert: 'Ekspert',
+  profesional: 'Profesionist',
 }
 
 const NOTIF_ITEMS = [
-  { key: 'visit_reminder', label: '📅 Kujtues vizitash', desc: 'Njoftim çdo javë nëse nuk ke vizituar kopshtin' },
-  { key: 'community_reply', label: '💬 Përgjigje komuniteti', desc: 'Kur dikush komenton postimet tuaja' },
-  { key: 'marketplace', label: '🛒 Marketplace', desc: 'Listim të reja të ngjashme me interesat tuaja' },
-  { key: 'ai_tips', label: '🤖 Këshilla AI', desc: 'Këshilla sezonale nga Bletari AI' },
+  { key: 'visit_reminder', label: 'Kujtues vizitash', desc: 'Njoftim çdo javë nëse nuk ke vizituar kopshtin' },
+  { key: 'community_reply', label: 'Përgjigje komuniteti', desc: 'Kur dikush komenton postimet tuaja' },
+  { key: 'marketplace', label: 'Marketplace', desc: 'Listim të reja të ngjashme me interesat tuaja' },
+  { key: 'ai_tips', label: 'Këshilla AI', desc: 'Këshilla sezonale nga Bletari AI' },
 ]
 
 function loadNotifPrefs() {
@@ -121,7 +121,7 @@ export default function ProfilePage() {
               width: '80px',
               height: '80px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--gold), var(--wood))',
+              background: 'var(--ink)',
               color: 'white',
               display: 'flex',
               alignItems: 'center',
@@ -129,19 +129,19 @@ export default function ProfilePage() {
               fontSize: '2rem',
               fontWeight: 800,
               flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(245,166,35,0.3)',
+              boxShadow: '0 4px 12px rgba(227,162,26,0.3)',
             }}>
-              {user?.name?.charAt(0)?.toUpperCase() || '🐝'}
+              {user?.name?.charAt(0)?.toUpperCase() || ''}
             </div>
 
             <div style={{ flex: 1 }}>
               <h1 style={{ fontSize: '1.4rem', marginBottom: '0.25rem' }}>{user?.name}</h1>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.5rem' }}>
                 {user?.location && (
-                  <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>📍 {user.location}</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>{user.location}</span>
                 )}
                 <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-                  {EXPERIENCE_LABELS[user?.experience] || '🌱 Fillestar'}
+                  {EXPERIENCE_LABELS[user?.experience] || 'Fillestar'}
                 </span>
               </div>
               <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: 0 }}>
@@ -165,10 +165,10 @@ export default function ProfilePage() {
             borderTop: '1px solid var(--border)',
           }}>
             {[
-              { icon: '🏡', value: stats.apiaries, label: 'Kopshte' },
-              { icon: '🐝', value: stats.hives, label: 'Koshere' },
-              { icon: '📅', value: stats.visits, label: 'Vizita' },
-              { icon: '💬', value: stats.posts, label: 'Postime' },
+              { icon: '', value: stats.apiaries, label: 'Kopshte' },
+              { icon: '', value: stats.hives, label: 'Koshere' },
+              { icon: '', value: stats.visits, label: 'Vizita' },
+              { icon: '', value: stats.posts, label: 'Postime' },
             ].map(s => (
               <div key={s.label} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '1.4rem', marginBottom: '0.15rem' }}>{s.icon}</div>
@@ -182,9 +182,9 @@ export default function ProfilePage() {
         {/* Tabs */}
         <div className="tabs">
           {[
-            { id: 'profile', label: '👤 Profili' },
-            { id: 'security', label: '🔒 Siguria' },
-            { id: 'notifications', label: '🔔 Njoftimet' },
+            { id: 'profile', label: 'Profili' },
+            { id: 'security', label: 'Siguria' },
+            { id: 'notifications', label: 'Njoftimet' },
           ].map(t => (
             <button key={t.id} className={`tab ${activeTab === t.id ? 'active' : ''}`}
               onClick={() => setActiveTab(t.id)}>{t.label}</button>
@@ -195,23 +195,23 @@ export default function ProfilePage() {
         {activeTab === 'profile' && (
           <div className="card card-body">
             {error && <div className="alert alert-error">{error}</div>}
-            {success && <div className="alert alert-success">✅ {success}</div>}
+            {success && <div className="alert alert-success">{success}</div>}
 
             {editMode ? (
               <div>
                 <div className="form-group">
-                  <label className="form-label">👤 Emri i plotë</label>
+                  <label className="form-label">Emri i plotë</label>
                   <input type="text" className="form-control" value={form.name}
                     onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">📍 Vendndodhja</label>
+                  <label className="form-label">Vendndodhja</label>
                   <input type="text" className="form-control" value={form.location}
                     onChange={e => setForm(p => ({ ...p, location: e.target.value }))}
                     placeholder="p.sh. Shkodër, Tiranë..." />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">🏆 Niveli i Eksperiencës</label>
+                  <label className="form-label">Niveli i Eksperiencës</label>
                   <select className="form-control" value={form.experience}
                     onChange={e => setForm(p => ({ ...p, experience: e.target.value }))}>
                     {Object.entries(EXPERIENCE_LABELS).map(([k, v]) => (
@@ -220,7 +220,7 @@ export default function ProfilePage() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">📝 Bio</label>
+                  <label className="form-label">Bio</label>
                   <textarea className="form-control" rows={3} value={form.bio}
                     onChange={e => setForm(p => ({ ...p, bio: e.target.value }))}
                     placeholder="Trego pak për veten dhe eksperiencën tënde..." />
@@ -228,18 +228,18 @@ export default function ProfilePage() {
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
                   <button className="btn btn-ghost" onClick={() => setEditMode(false)}>Anulo</button>
                   <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                    {saving ? '⏳ Duke ruajtur...' : '💾 Ruaj Ndryshimet'}
+                    {saving ? 'Duke ruajtur...' : 'Ruaj Ndryshimet'}
                   </button>
                 </div>
               </div>
             ) : (
               <div>
                 {[
-                  { label: '👤 Emri', value: user?.name },
-                  { label: '📧 Email', value: user?.email },
-                  { label: '📍 Vendndodhja', value: user?.location || '—' },
-                  { label: '🏆 Eksperienca', value: EXPERIENCE_LABELS[user?.experience] || '—' },
-                  { label: '📝 Bio', value: user?.bio || '—' },
+                  { label: 'Emri', value: user?.name },
+                  { label: 'Email', value: user?.email },
+                  { label: 'Vendndodhja', value: user?.location || '—' },
+                  { label: 'Eksperienca', value: EXPERIENCE_LABELS[user?.experience] || '—' },
+                  { label: 'Bio', value: user?.bio || '—' },
                 ].map(f => (
                   <div key={f.label} style={{
                     display: 'flex',
@@ -254,7 +254,7 @@ export default function ProfilePage() {
                 ))}
                 <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
                   <button className="btn btn-primary" onClick={() => setEditMode(true)}>
-                    ✏️ Edito Profilin
+                    Edito Profilin
                   </button>
                 </div>
               </div>
@@ -265,9 +265,9 @@ export default function ProfilePage() {
         {/* Security Tab */}
         {activeTab === 'security' && (
           <div className="card card-body">
-            <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem' }}>🔒 Ndrysho Fjalëkalimin</h3>
-            {pwError && <div className="alert alert-error">⚠️ {pwError}</div>}
-            {pwSuccess && <div className="alert alert-success">✅ {pwSuccess}</div>}
+            <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem' }}>Ndrysho Fjalëkalimin</h3>
+            {pwError && <div className="alert alert-error">{pwError}</div>}
+            {pwSuccess && <div className="alert alert-success">{pwSuccess}</div>}
             <form onSubmit={handlePasswordChange}>
               <div className="form-group">
                 <label className="form-label">Fjalëkalimi Aktual</label>
@@ -286,7 +286,7 @@ export default function ProfilePage() {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <button type="submit" className="btn btn-primary">
-                  🔒 Ndrysho Fjalëkalimin
+                  Ndrysho Fjalëkalimin
                 </button>
               </div>
             </form>
@@ -296,10 +296,10 @@ export default function ProfilePage() {
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (
           <div className="card card-body">
-            <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem' }}>🔔 Preferencat e Njoftimeve</h3>
+            <h3 style={{ fontSize: '1rem', marginBottom: '1.25rem' }}>Preferencat e Njoftimeve</h3>
             {notifSaved && (
               <div className="alert" style={{ background: 'rgba(74,124,89,0.15)', color: 'var(--green)', border: '1px solid var(--green)', borderRadius: 'var(--radius-sm)', padding: '0.6rem 1rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                ✅ Preferencat u ruajtën!
+                Preferencat u ruajtën!
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -351,7 +351,7 @@ export default function ProfilePage() {
               })}
             </div>
             <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
-              <button className="btn btn-primary" onClick={saveNotifPrefs}>💾 Ruaj Preferencat</button>
+              <button className="btn btn-primary" onClick={saveNotifPrefs}>Ruaj Preferencat</button>
             </div>
           </div>
         )}

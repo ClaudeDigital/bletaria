@@ -1,92 +1,58 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { authAPI } from '../api'
+import { AUTH_CSS } from './LoginPage'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
-  const [step, setStep] = useState('email') // 'email' | 'sent'
+  const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!email) { setError('Shkruaj emailin tënd.'); return }
+    if (!email.trim()) { setError('Shkruaj email-in e llogarisë.'); return }
     setError('')
     setLoading(true)
     try {
       await authAPI.forgotPassword({ email })
-      setStep('sent')
+      setSent(true)
     } catch (err) {
-      setError(err.response?.data?.message || 'Gabim. Provo sërish.')
+      setError(err.response?.data?.error || 'Kërkesa nuk u dërgua. Provo përsëri.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{
-      minHeight: 'calc(100vh - 64px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem 1rem',
-      background: 'var(--surface)',
-    }}>
-      <div style={{ width: '100%', maxWidth: '420px' }}>
-        <div className="card">
-          <div style={{ padding: '2rem 2rem 0', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>{step === 'sent' ? '📬' : '🔑'}</div>
-            <h1 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>
-              {step === 'sent' ? 'Email u dërgua!' : 'Fjalëkalimi i Harruar'}
-            </h1>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>
-              {step === 'sent'
-                ? `Kontrol emailin ${email} për udhëzimet e rivendosjes.`
-                : 'Shkruaj emailin tënd dhe do të dërgojmë instruksione.'
-              }
-            </p>
-          </div>
-
-          <div style={{ padding: '1.75rem 2rem 2rem' }}>
-            {step === 'email' ? (
-              <form onSubmit={handleSubmit}>
-                {error && <div className="alert alert-error">⚠️ {error}</div>}
+    <div className="auth-page">
+      <style>{AUTH_CSS}</style>
+      <div className="container" style={{ maxWidth: 480 }}>
+        <div className="auth-main">
+          {sent ? (
+            <>
+              <h1>Shiko email-in</h1>
+              <p className="auth-sub">Nëse {email} ka llogari, të dërguam një lidhje për fjalëkalim të ri. Lidhja vlen 1 orë.</p>
+              <Link to="/login" className="btn btn-ghost btn-lg">Kthehu te hyrja</Link>
+            </>
+          ) : (
+            <>
+              <h1>Fjalëkalim i ri</h1>
+              <p className="auth-sub">Shkruaj email-in e llogarisë dhe të dërgojmë një lidhje.</p>
+              <form onSubmit={handleSubmit} noValidate>
+                {error && <div className="alert alert-error" role="alert">{error}</div>}
                 <div className="form-group">
-                  <label className="form-label">📧 Email-i juaj</label>
-                  <input
-                    type="email"
-                    className="form-control"
-                    placeholder="email@shembull.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    autoFocus
-                  />
+                  <label className="form-label" htmlFor="email">Email</label>
+                  <input id="email" type="email" inputMode="email" className="form-control" autoComplete="email"
+                    value={email} onChange={e => setEmail(e.target.value)} />
                 </div>
-                <button type="submit" className="btn btn-primary w-full btn-lg" disabled={loading}>
-                  {loading ? '⏳ Duke dërguar...' : '📨 Dërgo Email'}
+                <button type="submit" className="btn btn-primary btn-lg w-full" disabled={loading}>
+                  {loading ? 'Duke dërguar…' : 'Dërgo lidhjen'}
                 </button>
               </form>
-            ) : (
-              <div>
-                <div className="alert alert-success">
-                  ✅ Udhëzimet u dërguan! Kontrollo edhe dosjen Spam.
-                </div>
-                <button
-                  onClick={() => setStep('email')}
-                  className="btn btn-ghost w-full"
-                  style={{ marginTop: '0.5rem' }}
-                >
-                  🔄 Dërgo sërish
-                </button>
-              </div>
-            )}
-
-            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-              <Link to="/login" style={{ color: 'var(--gold)', fontSize: '0.9rem', fontWeight: 600 }}>
-                ← Kthehu tek Hyrja
-              </Link>
-            </div>
-          </div>
+              <p className="auth-switch"><Link to="/login">Kthehu te hyrja</Link></p>
+            </>
+          )}
         </div>
       </div>
     </div>

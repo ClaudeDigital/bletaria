@@ -4,10 +4,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { apiaryAPI, hiveAPI, visitAPI } from '../api'
 
 const STATUS_OPTIONS = [
-  { value: 'good',    label: '✅ Mirë',    color: '#4A7C59' },
-  { value: 'problem', label: '⚠️ Problem', color: '#F5A623' },
-  { value: 'dead',    label: '💀 Vdekur',  color: '#C0392B' },
-  { value: 'empty',   label: '⬜ Bosh',    color: '#aaa' },
+  { value: 'good',    label: 'Mirë',    color: 'var(--meadow)' },
+  { value: 'problem', label: 'Problem', color: 'var(--honey)' },
+  { value: 'dead',    label: 'Vdekur',  color: 'var(--propolis)' },
+  { value: 'empty',   label: 'Bosh',    color: 'var(--line-strong)' },
 ]
 
 export default function VisitPage() {
@@ -107,38 +107,38 @@ export default function VisitPage() {
       <div className="container" style={{ maxWidth: '800px' }}>
         {/* Breadcrumb */}
         <nav className="breadcrumb">
-          <Link to="/dashboard">🏠 Dashboard</Link>
-          <span className="breadcrumb-sep">›</span>
-          <Link to={`/apiary/${apiaryId}`}>🏡 {apiary?.name}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>📝 Vizitë e Re</span>
+          <Link to="/dashboard">Kopshtet</Link>
+          <span className="breadcrumb-sep">/</span>
+          <Link to={`/apiary/${apiaryId}`}>{apiary?.name}</Link>
+          <span className="breadcrumb-sep">/</span>
+          <span>Vizitë e Re</span>
         </nav>
 
         <div className="page-header">
-          <h1 className="page-title">📝 Regjistro Vizitë</h1>
+          <h1 className="page-title">Vizitë e re</h1>
         </div>
 
-        {error && <div className="alert alert-error">⚠️ {error}</div>}
-        {success && <div className="alert alert-success">✅ Vizita u ruajt me sukses! Duke u kthyer...</div>}
+        {error && <div className="alert alert-error">{error}</div>}
+        {success && <div className="alert alert-success">Vizita u ruajt me sukses! Duke u kthyer...</div>}
 
         <form onSubmit={handleSubmit}>
           {/* General info */}
           <div className="card card-body" style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>📋 Të dhënat e Vizitës</h3>
+            <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Të dhënat e Vizitës</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">📅 Data</label>
+                <label className="form-label">Data</label>
                 <input type="date" className="form-control" value={visitDate}
                   onChange={e => setVisitDate(e.target.value)} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">🏡 Kopshti</label>
+                <label className="form-label">Kopshti</label>
                 <input type="text" className="form-control" value={apiary?.name || ''} readOnly
                   style={{ background: 'var(--surface)', cursor: 'default' }} />
               </div>
             </div>
             <div className="form-group" style={{ marginTop: '1rem', marginBottom: 0 }}>
-              <label className="form-label">📝 Shënime të Përgjithshme</label>
+              <label className="form-label">Shënime të Përgjithshme</label>
               <textarea className="form-control" rows={2} value={visitNotes}
                 onChange={e => setVisitNotes(e.target.value)}
                 placeholder="Vëzhgime të përgjithshme për kopshtin sot..." />
@@ -192,8 +192,8 @@ export default function VisitPage() {
                         {STATUS_OPTIONS.find(s => s.value === data.status)?.label || '—'}
                       </span>
                       {data.queen_present
-                        ? <span style={{ fontSize: '0.8rem' }}>👑</span>
-                        : <span style={{ fontSize: '0.8rem' }}>⚠️ Pa mbretëreshë</span>
+                        ? <span style={{ fontSize: '0.8rem' }}></span>
+                        : <span style={{ fontSize: '0.8rem' }}>Pa mbretëreshë</span>
                       }
                     </div>
                     <span style={{ color: 'var(--muted)', fontSize: '0.8rem', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
@@ -225,17 +225,17 @@ export default function VisitPage() {
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '0.75rem' }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label className="form-label" style={{ fontSize: '0.78rem' }}>👑 Mbretëresha</label>
+                          <label className="form-label" style={{ fontSize: '0.78rem' }}>Mbretëresha</label>
                           <select className="form-control" value={data.queen_present ? 'po' : 'jo'}
                             onChange={e => updateHive(hive.id, 'queen_present', e.target.value === 'po')}
                             style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}>
-                            <option value="po">✅ E pranishme</option>
-                            <option value="jo">⚠️ Mungon</option>
+                            <option value="po">E pranishme</option>
+                            <option value="jo">Mungon</option>
                           </select>
                         </div>
                         {data.queen_present && (
                           <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label" style={{ fontSize: '0.78rem' }}>📅 Mosha (muaj)</label>
+                            <label className="form-label" style={{ fontSize: '0.78rem' }}>Mosha (muaj)</label>
                             <input type="number" className="form-control" min="0" max="60"
                               value={data.queen_age}
                               onChange={e => updateHive(hive.id, 'queen_age', e.target.value)}
@@ -246,7 +246,7 @@ export default function VisitPage() {
                       </div>
 
                       <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label" style={{ fontSize: '0.78rem' }}>📝 Shënime</label>
+                        <label className="form-label" style={{ fontSize: '0.78rem' }}>Shënime</label>
                         <textarea className="form-control" rows={2} value={data.notes}
                           onChange={e => updateHive(hive.id, 'notes', e.target.value)}
                           placeholder="Vëzhgime specifike për këtë koshère..."
@@ -292,7 +292,7 @@ export default function VisitPage() {
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
             <Link to={`/apiary/${apiaryId}`} className="btn btn-ghost">Anulo</Link>
             <button type="submit" className="btn btn-primary btn-lg" disabled={saving}>
-              {saving ? '⏳ Duke ruajtur...' : '💾 Ruaj Vizitën'}
+              {saving ? 'Duke ruajtur...' : 'Ruaj vizitën'}
             </button>
           </div>
         </form>

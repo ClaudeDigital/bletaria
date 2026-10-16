@@ -1,60 +1,15 @@
 import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { MapPin, ClipboardPen, CalendarPlus, Droplets, Trash2, X, ChevronLeft, StickyNote } from 'lucide-react'
 import { apiaryAPI, hiveAPI, visitAPI } from '../api'
+import HiveStack, { STATUS } from '../components/HiveStack'
+import { fmtDay, relDay } from '../lib/format'
 
-const STATUS_CONFIG = {
-  good:    { color: '#4A7C59', label: 'Mirë',    emoji: '✅' },
-  problem: { color: '#F5A623', label: 'Problem', emoji: '⚠️' },
-  dead:    { color: '#C0392B', label: 'Vdekur',  emoji: '💀' },
-  empty:   { color: '#E8E8E8', label: 'Bosh',    emoji: '⬜' },
-}
+const STATUS_KEYS = ['good', 'problem', 'dead', 'empty']
+const shortCode = (h) => `${h.position_row}-${h.position_col}`
 
-function HiveSquare({ hive, onClick, size = 76 }) {
-  const st = STATUS_CONFIG[hive.status] || STATUS_CONFIG.empty
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-  const emptyColor = isDark ? '#444' : '#E8E8E8'
-  const textColor = hive.status === 'empty' ? '#999' : 'white'
-  const [hovered, setHovered] = useState(false)
-
-  return (
-    <div
-      onClick={() => onClick(hive)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        width: size,
-        height: size,
-        background: hive.status === 'empty' ? emptyColor : st.color,
-        borderRadius: '8px',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: hovered ? '2px solid var(--gold)' : '2px solid transparent',
-        transition: 'all 0.15s ease',
-        transform: hovered ? 'scale(1.08)' : 'scale(1)',
-        boxShadow: hovered ? '0 4px 12px rgba(0,0,0,0.25)' : '0 1px 3px rgba(0,0,0,0.15)',
-        position: 'relative',
-        userSelect: 'none',
-      }}
-      title={`${hive.code} — ${st.label}`}
-    >
-      <span style={{ fontSize: size > 60 ? '0.7rem' : '0.58rem', fontWeight: 700, color: textColor, lineHeight: 1 }}>
-        {hive.code}
-      </span>
-      {size > 55 && (
-        <span style={{ fontSize: '0.8rem', marginTop: '2px' }}>
-          {hive.queen_present ? '👑' : hive.status !== 'empty' ? '⚠️' : ''}
-        </span>
-      )}
-    </div>
-  )
-}
-
-function HiveDetailModal({ hive, apiaryId, onClose, onUpdated }) {
-  const navigate = useNavigate()
+function HiveDetailModal({ hive, onClose, onUpdated }) {
   const [status, setStatus] = useState(hive.status || 'good')
   const [queen, setQueen] = useState(hive.queen_present ? 'po' : 'jo')
   const [queenAge, setQueenAge] = useState(hive.queen_age_months || '')
@@ -69,119 +24,71 @@ function HiveDetailModal({ hive, apiaryId, onClose, onUpdated }) {
         status,
         queen_present: queen === 'po',
         queen_age_months: queenAge ? parseInt(queenAge) : null,
-        notes,
+        notes: notes.trim(),
       })
-      onUpdated(res.data.hive || res.data)
-      onClose()
-    } catch (err) {
-      setError('Gabim duke ruajtur.')
+      onUpdated({ ...hive, ...(res.data.hive || res.data), status, queen_present: queen === 'po' ? 1 : 0, notes: notes.trim() })
+    } catch {
+      setError('Ndryshimet nuk u ruajtën. Provo përsëri.')
     } finally {
       setSaving(false)
     }
   }
 
-  const st = STATUS_CONFIG[status] || STATUS_CONFIG.good
-
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="hive-title" style={{ maxWidth: 460 }}>
         <div className="modal-header">
-          <span className="modal-title">🐝 Koshère {hive.code}</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+            <HiveStack seed={hive.id} floors={hive.floor_count || hive.floors?.length} status={status} queenless={queen === 'jo'} width={40} />
+            <div>
+              <h2 className="modal-title" id="hive-title">Kosherja {shortCode(hive)}</h2>
+              <span style={{ fontSize: '.82rem', color: 'var(--ink-2)' }}>{hive.code}, {hive.floor_count || hive.floors?.length || 1} kate</span>
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Mbyll"><X size={18} /></button>
         </div>
         <div className="modal-body">
-          {error && <div className="alert alert-error">⚠️ {error}</div>}
+          {error && <div className="alert alert-error" role="alert">{error}</div>}
 
-          {/* Status indicator */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            padding: '0.75rem 1rem',
-            background: 'var(--surface)',
-            borderRadius: 'var(--radius-sm)',
-            marginBottom: '1.25rem',
-          }}>
-            <div style={{ width: '14px', height: '14px', borderRadius: '4px', background: st.color, flexShrink: 0 }} />
-            <span style={{ fontWeight: 600 }}>{st.emoji} {st.label}</span>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Statusi</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setStatus(key)}
-                  style={{
-                    padding: '0.5rem 0.25rem',
-                    border: `2px solid ${status === key ? cfg.color : 'var(--border)'}`,
-                    borderRadius: 'var(--radius-sm)',
-                    background: status === key ? `${cfg.color}20` : 'var(--bg)',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    color: status === key ? cfg.color : 'var(--muted)',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {cfg.emoji}<br />{cfg.label}
+          <fieldset className="form-group" style={{ border: 'none' }}>
+            <legend className="form-label">Gjendja</legend>
+            <div className="seg">
+              {STATUS_KEYS.map(k => (
+                <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>
+                  <span className="dot" style={{ background: STATUS[k].color }} /> {STATUS[k].label}
                 </button>
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          {status !== 'empty' && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">👑 Mbretëresha</label>
-                  <select className="form-control" value={queen} onChange={e => setQueen(e.target.value)}>
-                    <option value="po">✅ E pranishme</option>
-                    <option value="jo">⚠️ Mungon</option>
-                  </select>
-                </div>
-                {queen === 'po' && (
-                  <div className="form-group">
-                    <label className="form-label">📅 Mosha (muaj)</label>
-                    <input type="number" className="form-control" min="0" max="60" value={queenAge}
-                      onChange={e => setQueenAge(e.target.value)} placeholder="p.sh. 12" />
-                  </div>
-                )}
-              </div>
-
+          {status !== 'empty' && status !== 'dead' && (
+            <div className="grid-2" style={{ gap: 12 }}>
               <div className="form-group">
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' }}>
-                  <input
-                    type="checkbox"
-                    checked={notes !== ''}
-                    onChange={e => { if (!e.target.checked) setNotes('') }}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  📝 Shto Shënim
-                </label>
-                {notes !== '' || (
-                  <button type="button" style={{ fontSize: '0.8rem', color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                    onClick={() => setNotes(' ')}>+ Shto shënim</button>
-                )}
-                {notes !== '' && (
-                  <textarea className="form-control" rows={2} value={notes}
-                    onChange={e => setNotes(e.target.value)} placeholder="Shënime për këtë koshère..." autoFocus />
-                )}
+                <label className="form-label" htmlFor="queen">Mbretëresha</label>
+                <select id="queen" className="form-control" value={queen} onChange={e => setQueen(e.target.value)}>
+                  <option value="po">Është aty</option>
+                  <option value="jo">Mungon</option>
+                </select>
               </div>
-            </>
+              {queen === 'po' && (
+                <div className="form-group">
+                  <label className="form-label" htmlFor="qage">Mosha në muaj</label>
+                  <input id="qage" type="number" inputMode="numeric" className="form-control" min="0" max="60"
+                    value={queenAge} onChange={e => setQueenAge(e.target.value)} placeholder="p.sh. 12" />
+                </div>
+              )}
+            </div>
           )}
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="hnotes">Shënim</label>
+            <textarea id="hnotes" className="form-control" rows={2} value={notes}
+              onChange={e => setNotes(e.target.value)} placeholder="Çfarë pe në këtë koshere?" />
+          </div>
         </div>
         <div className="modal-footer">
-          <Link to={`/hive/${hive.id}`} className="btn btn-ghost btn-sm" onClick={onClose}>
-            📋 Shiko Detajet
-          </Link>
-          <div style={{ flex: 1 }} />
-          <button className="btn btn-ghost" onClick={onClose}>Anulo</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? '⏳' : '💾 Ruaj'}
-          </button>
+          <Link to={`/hive/${hive.id}`} className="btn btn-ghost" onClick={onClose} style={{ marginRight: 'auto' }}>Katet dhe historia</Link>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Duke ruajtur…' : 'Ruaj'}</button>
         </div>
       </div>
     </div>
@@ -189,93 +96,50 @@ function HiveDetailModal({ hive, apiaryId, onClose, onUpdated }) {
 }
 
 function PlanVisitModal({ apiaryId, onClose, onPlanned }) {
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10)
-  const [date, setDate] = useState(tomorrowStr)
+  const t = new Date(); t.setDate(t.getDate() + 1)
+  const tomorrow = t.toISOString().slice(0, 10)
+  const [date, setDate] = useState(tomorrow)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!date) { setError('Zgjidh datën'); return }
+    if (!date) { setError('Zgjidh datën e vizitës.'); return }
     setSaving(true)
     try {
       const res = await visitAPI.create({ apiary_id: apiaryId, visit_date: date, notes, status: 'planned' })
       onPlanned(res.data)
-      onClose()
-    } catch { setError('Gabim duke ruajtur.') }
+    } catch { setError('Vizita nuk u planifikua. Provo përsëri.') }
     finally { setSaving(false) }
   }
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: '420px' }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="plan-title" style={{ maxWidth: 420 }}>
         <div className="modal-header">
-          <span className="modal-title">📅 Planifiko Vizitë</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <h2 className="modal-title" id="plan-title">Planifiko vizitë</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Mbyll"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-error">⚠️ {error}</div>}
+            {error && <div className="alert alert-error" role="alert">{error}</div>}
             <div className="form-group">
-              <label className="form-label">📅 Data e vizitës</label>
-              <input type="date" className="form-control" value={date} min={tomorrowStr}
-                onChange={e => setDate(e.target.value)} required />
-              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '0.35rem' }}>
-                🔔 Do të marrësh njoftim Telegram 1 ditë para vizitës
-              </div>
+              <label className="form-label" htmlFor="pdate">Data</label>
+              <input id="pdate" type="date" className="form-control" value={date} min={tomorrow} onChange={e => setDate(e.target.value)} required />
+              <p className="form-hint">Një ditë më parë të vjen kujtesa në Telegram.</p>
             </div>
             <div className="form-group">
-              <label className="form-label">📝 Shënime (opsionale)</label>
-              <textarea className="form-control" rows={2} value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="p.sh. Kontroll i mbretëreshës, trajtim Varroa..." />
+              <label className="form-label" htmlFor="pnotes">Çfarë do të bësh</label>
+              <textarea id="pnotes" className="form-control" rows={2} value={notes} onChange={e => setNotes(e.target.value)}
+                placeholder="p.sh. kontroll i mbretëreshës, trajtim për varroa" />
             </div>
           </div>
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Anulo</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? '⏳' : '📅 Ruaj Planin'}
-            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Duke ruajtur…' : 'Planifiko'}</button>
           </div>
         </form>
-      </div>
-    </div>
-  )
-}
-
-function HiveNotesModal({ hive, onClose, onSaved }) {
-  const [notes, setNotes] = useState(hive.notes || '')
-  const [saving, setSaving] = useState(false)
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await hiveAPI.patchNotes(hive.id, notes)
-      onSaved({ ...hive, notes })
-      onClose()
-    } catch {} finally { setSaving(false) }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: '420px' }}>
-        <div className="modal-header">
-          <span className="modal-title">📝 Shënime — Koshère {hive.code}</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <textarea className="form-control" rows={4} value={notes} autoFocus
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Shënime specifike për këtë koshère..." />
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={onClose}>Anulo</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? '⏳' : '💾 Ruaj'}
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -288,301 +152,208 @@ export default function ApiaryPage() {
   const [hives, setHives] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedHive, setSelectedHive] = useState(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showPlanVisit, setShowPlanVisit] = useState(false)
-  const [notesHive, setNotesHive] = useState(null)
-  const [plannedVisits, setPlannedVisits] = useState([])
+  const [showDelete, setShowDelete] = useState(false)
+  const [showPlan, setShowPlan] = useState(false)
+  const [planned, setPlanned] = useState([])
+  const [filter, setFilter] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    loadData()
+    setLoading(true)
+    Promise.all([apiaryAPI.get(id), hiveAPI.list(id), visitAPI.list(id)])
+      .then(([a, h, v]) => {
+        setApiary(a.data.apiary || a.data)
+        const list = h.data.hives || h.data || []
+        setHives(Array.isArray(list) ? list : [])
+        setPlanned((v.data || []).filter(x => x.status === 'planned').sort((x, y) => x.visit_date.localeCompare(y.visit_date)))
+      })
+      .catch(() => setError('Ky kopsht nuk u gjet.'))
+      .finally(() => setLoading(false))
   }, [id])
 
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const [apiaryRes, hivesRes, visitsRes] = await Promise.all([
-        apiaryAPI.get(id),
-        hiveAPI.list(id),
-        visitAPI.list(id),
-      ])
-      setApiary(apiaryRes.data.apiary || apiaryRes.data)
-      const h = hivesRes.data.hives || hivesRes.data || []
-      setHives(Array.isArray(h) ? h : [])
-      const allVisits = visitsRes.data || []
-      setPlannedVisits(allVisits.filter(v => v.status === 'planned').sort((a, b) => a.visit_date.localeCompare(b.visit_date)))
-    } catch {
-      setError('Kopshti nuk u gjet.')
-    } finally {
-      setLoading(false)
-    }
+  const cancelPlanned = async (visitId) => {
+    if (!window.confirm('Ta heqim këtë vizitë të planifikuar?')) return
+    try { await visitAPI.delete(visitId); setPlanned(p => p.filter(v => v.id !== visitId)) } catch {}
   }
 
-  const cancelPlannedVisit = async (visitId) => {
-    if (!window.confirm('Anulo vizitën e planifikuar?')) return
-    try {
-      await visitAPI.delete(visitId)
-      setPlannedVisits(prev => prev.filter(v => v.id !== visitId))
-    } catch {}
+  const handleDelete = async () => {
+    try { await apiaryAPI.delete(id); navigate('/dashboard') }
+    catch { setError('Kopshti nuk u fshi. Provo përsëri.'); setShowDelete(false) }
   }
 
-  const handleDeleteApiary = async () => {
-    try {
-      await apiaryAPI.delete(id)
-      navigate('/dashboard')
-    } catch {
-      setError('Gabim duke fshirë kopshtin.')
-    }
-    setShowDeleteConfirm(false)
-  }
-
-  const handleHiveUpdated = (updated) => {
-    setHives(prev => prev.map(h => h.id === updated.id ? { ...h, ...updated } : h))
-  }
-
-  // Group hives by row
-  const rows = apiary ? apiary.rows || 1 : 1
-  const hivesPerRow = apiary ? apiary.hives_per_row || 1 : 1
-  const hiveGrid = []
-  for (let r = 0; r < rows; r++) {
-    hiveGrid.push(hives.slice(r * hivesPerRow, (r + 1) * hivesPerRow))
-  }
-
-  const statusCounts = hives.reduce((acc, h) => {
-    acc[h.status] = (acc[h.status] || 0) + 1
-    return acc
-  }, {})
-
-  if (loading) return (
-    <PageLoader />
+  if (loading) return <PageLoader />
+  if (error && !apiary) return (
+    <div className="page-content"><div className="container">
+      <div className="alert alert-error">{error}</div>
+      <Link to="/dashboard" className="btn btn-ghost"><ChevronLeft size={18} /> Kopshtet</Link>
+    </div></div>
   )
 
-  if (error) return (
-    <div className="page-content">
-      <div className="container">
-        <div className="alert alert-error">{error}</div>
-        <Link to="/dashboard" className="btn btn-ghost">← Kthehu</Link>
-      </div>
-    </div>
-  )
+  const rows = []
+  hives.forEach(h => {
+    const r = rows.find(x => x.r === h.position_row)
+    if (r) r.hives.push(h); else rows.push({ r: h.position_row, hives: [h] })
+  })
+  rows.sort((a, b) => a.r - b.r)
+
+  const counts = hives.reduce((acc, h) => { acc[h.status] = (acc[h.status] || 0) + 1; return acc }, {})
+  const queenless = hives.filter(h => !h.queen_present && (h.status === 'good' || h.status === 'problem')).length
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 520
+  const listed = filter ? hives.filter(h => filter === 'queenless' ? (!h.queen_present && (h.status === 'good' || h.status === 'problem')) : h.status === filter) : hives
 
   return (
     <div className="page-content">
+      <style>{APIARY_CSS}</style>
       <div className="container">
-        {/* Breadcrumb */}
-        <nav className="breadcrumb">
-          <Link to="/dashboard">🏠 Dashboard</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>🏡 {apiary?.name}</span>
+        <nav className="breadcrumb" aria-label="Vendndodhja">
+          <Link to="/dashboard">Kopshtet</Link>
+          <span className="breadcrumb-sep">/</span>
+          <span>{apiary?.name}</span>
         </nav>
 
-        {/* Header */}
         <div className="page-header">
           <div>
             <h1 className="page-title">{apiary?.name}</h1>
-            {apiary?.location && (
-              <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>📍 {apiary.location}</p>
-            )}
+            {apiary?.location && <p className="ap-loc"><MapPin size={16} /> {apiary.location}</p>}
           </div>
           <div className="page-actions">
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowPlanVisit(true)}>📅 Planifiko Vizitë</button>
-            <Link to={`/apiary/${id}/visit`} className="btn btn-primary">📝 Shto Vizitë</Link>
-            <Link to={`/apiary/${id}/feeding`} className="btn btn-green">🌿 Plan Ushqimi</Link>
-            <button className="btn btn-danger btn-sm" onClick={() => setShowDeleteConfirm(true)} title="Fshi Kopsht">🗑</button>
+            <Link to={`/apiary/${id}/visit`} className="btn btn-primary"><ClipboardPen size={18} /> Regjistro vizitë</Link>
+            <button className="btn btn-ghost" onClick={() => setShowPlan(true)}><CalendarPlus size={18} /> Planifiko</button>
+            <Link to={`/apiary/${id}/feeding`} className="btn btn-ghost"><Droplets size={18} /> Ushqimi</Link>
+            <button className="btn btn-ghost btn-icon" onClick={() => setShowDelete(true)} aria-label="Fshi kopshtin"><Trash2 size={18} /></button>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="stats-grid" style={{ marginBottom: '2rem' }}>
-          <div className="stat-card">
-            <div className="stat-value">{hives.length}</div>
-            <div className="stat-label">Gjithsej Koshere</div>          </div>
-          <div className="stat-card">
-            <div className="stat-value" style={{ color: '#4A7C59' }}>{statusCounts.good || 0}</div>
-            <div className="stat-label">✅ Mirë</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value" style={{ color: '#F5A623' }}>{statusCounts.problem || 0}</div>
-            <div className="stat-label">⚠️ Problem</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value" style={{ color: '#C0392B' }}>{statusCounts.dead || 0}</div>
-            <div className="stat-label">💀 Vdekur</div>
-          </div>
+        {error && <div className="alert alert-error">{error}</div>}
+
+        {/* Filtrat = statistikat */}
+        <div className="ap-filters" role="group" aria-label="Filtro kosheret">
+          <button aria-pressed={!filter} onClick={() => setFilter(null)}>
+            <span className="stencil">{hives.length}</span> të gjitha
+          </button>
+          {STATUS_KEYS.filter(k => counts[k]).map(k => (
+            <button key={k} aria-pressed={filter === k} onClick={() => setFilter(filter === k ? null : k)}>
+              <span className="stencil" style={{ color: k === 'empty' ? undefined : STATUS[k].color }}>{counts[k]}</span> {STATUS[k].label.toLowerCase()}
+            </button>
+          ))}
+          {queenless > 0 && (
+            <button aria-pressed={filter === 'queenless'} onClick={() => setFilter(filter === 'queenless' ? null : 'queenless')}>
+              <span className="stencil" style={{ color: 'var(--propolis)' }}>{queenless}</span> pa mbretëreshë
+            </button>
+          )}
         </div>
 
-        {/* Hive Grid */}
-        <div className="card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h2 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              🐝 Koshere ({hives.length} gjithsej)
-            </h2>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
-              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--muted)' }}>
-                  <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: cfg.color, border: key === 'empty' ? '1px solid #ccc' : 'none' }} />
-                  {cfg.label}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ overflowX: 'auto', paddingBottom: '0.5rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 'fit-content' }}>
-              {hiveGrid.map((row, rIdx) => (
-                <div key={rIdx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)', width: '20px', textAlign: 'right', flexShrink: 0 }}>
-                    {rIdx + 1}
-                  </span>
-                  {row.map(hive => (
-                    <HiveSquare
-                      key={hive.id}
-                      hive={hive}
-                      onClick={setSelectedHive}
-                      size={window.innerWidth < 480 ? 52 : 76}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Planned Visits */}
-        {plannedVisits.length > 0 && (
-          <div className="card" style={{ marginBottom: '2rem', borderLeft: '3px solid var(--gold)' }}>
-            <div className="card-header" style={{ color: 'var(--gold)' }}>📅 Vizita të Planifikuara</div>
-            <div style={{ padding: '0.5rem 1.25rem 1rem' }}>
-              {plannedVisits.map(v => (
-                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.6rem 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-                  <div style={{ background: 'rgba(245,166,35,0.1)', color: 'var(--gold)', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', fontWeight: 700 }}>
-                    {new Date(v.visit_date).toLocaleDateString('sq-AL', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </div>
-                  {v.notes && <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>📝 {v.notes}</span>}
-                  <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
-                    <Link to={`/apiary/${id}/visit`} className="btn btn-primary btn-sm">📝 Regjistro</Link>
-                    <button className="btn btn-ghost btn-sm" onClick={() => cancelPlannedVisit(v.id)}>✕</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Notes */}
-        {apiary?.notes && (
-          <div className="card card-body" style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--muted)' }}>📝 Shënime</h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text)', margin: 0 }}>{apiary.notes}</p>
-          </div>
-        )}
-
-        {/* Hive list table */}
-        <div className="card" style={{ marginBottom: '2rem' }}>
-          <div className="card-header">📋 Lista e Koshereve</div>
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Kodi</th>
-                  <th>Statusi</th>
-                  <th>Mbretëresha</th>
-                  <th>Mosha</th>
-                  <th>Katet</th>
-                  <th>Shënim</th>
-                  <th>Veprime</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hives.map(h => {
-                  const st = STATUS_CONFIG[h.status] || STATUS_CONFIG.empty
+        {/* Oborri */}
+        <section className="ap-yard apiary-yard" aria-label="Kosheret sipas rreshtave">
+          {rows.map(row => (
+            <div key={row.r} className="ap-row">
+              <span className="ap-row-n stencil" aria-hidden="true">{row.r}</span>
+              <div className="ap-row-hives">
+                {row.hives.map(h => {
+                  const ql = !h.queen_present && (h.status === 'good' || h.status === 'problem')
+                  const dim = filter && !(filter === 'queenless' ? ql : h.status === filter)
                   return (
-                    <tr key={h.id}>
-                      <td style={{ fontWeight: 700 }}>{h.code}</td>
-                      <td>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '20px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          background: `${st.color}20`,
-                          color: h.status === 'empty' ? 'var(--muted)' : st.color,
-                        }}>
-                          {st.emoji} {st.label}
-                        </span>
-                      </td>
-                      <td>{h.queen_present ? '👑 Po' : <span style={{ color: 'var(--red)' }}>⚠️ Jo</span>}</td>
-                      <td style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
-                        {h.queen_age_months ? `${h.queen_age_months} muaj` : '—'}
-                      </td>
-                      <td style={{ color: 'var(--muted)' }}>{h.floor_count || 0}</td>
-                      <td>
-                        {h.notes
-                          ? <span style={{ fontSize: '0.78rem', color: 'var(--muted)', maxWidth: '120px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle', cursor: 'pointer' }} onClick={() => setNotesHive(h)} title={h.notes}>{h.notes}</span>
-                          : <button className="btn btn-ghost btn-sm" onClick={() => setNotesHive(h)} style={{ fontSize: '0.75rem' }}>+ Shënim</button>
-                        }
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setSelectedHive(h)}>✏️</button>
-                          <Link to={`/hive/${h.id}`} className="btn btn-ghost btn-sm">📋</Link>
-                        </div>
-                      </td>
-                    </tr>
+                    <button key={h.id} className="hive-btn" onClick={() => setSelectedHive(h)} style={{ opacity: dim ? .25 : 1 }}
+                      aria-label={`Kosherja ${shortCode(h)}, ${STATUS[h.status]?.label || ''}${ql ? ', pa mbretëreshë' : ''}`}>
+                      <HiveStack seed={h.id} floors={h.floor_count || h.floors?.length} status={h.status} queenless={ql} width={narrow ? 42 : 64} />
+                      <span className="hive-label">{h.position_col}</span>
+                    </button>
                   )
                 })}
+              </div>
+            </div>
+          ))}
+          <div className="ap-legend">
+            <span><span className="dot" style={{ background: 'var(--honey)', borderRadius: '50%' }} /> pikë e verdhë: me probleme</span>
+            <span><span className="dot" style={{ border: '2px solid var(--propolis)', borderRadius: '50%' }} /> rreth i kuq: pa mbretëreshë</span>
+            <span>Kutitë = katet. Prek kosheren për ta ndryshuar.</span>
+          </div>
+        </section>
+
+        <div className="ap-cols">
+          <section>
+            <h2 className="section-title">Vizitat e planifikuara</h2>
+            {planned.length === 0 ? (
+              <div className="card card-body">
+                <p style={{ marginBottom: 12 }}>Asnjë vizitë e planifikuar.</p>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowPlan(true)}><CalendarPlus size={16} /> Planifiko një</button>
+              </div>
+            ) : (
+              <ul className="ap-plans">
+                {planned.map(v => (
+                  <li key={v.id}>
+                    <div style={{ minWidth: 0 }}>
+                      <strong>{fmtDay(v.visit_date)}</strong>
+                      <span className="ap-rel">{relDay(v.visit_date)}</span>
+                      {v.notes && <p>{v.notes}</p>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Link to={`/apiary/${id}/visit`} className="btn btn-primary btn-sm">Regjistro</Link>
+                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => cancelPlanned(v.id)} aria-label="Hiq vizitën"><X size={16} /></button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          {apiary?.notes && (
+            <section>
+              <h2 className="section-title">Shënime</h2>
+              <div className="card card-body"><p style={{ color: 'var(--ink)' }}>{apiary.notes}</p></div>
+            </section>
+          )}
+        </div>
+
+        <section style={{ marginTop: 32 }}>
+          <h2 className="section-title">Lista {filter && <span style={{ fontWeight: 500, color: 'var(--ink-2)' }}>({listed.length})</span>}</h2>
+          <div className="card table-responsive">
+            <table className="table">
+              <thead>
+                <tr><th>Kosherja</th><th>Gjendja</th><th>Mbretëresha</th><th>Kate</th><th>Shënim</th></tr>
+              </thead>
+              <tbody>
+                {listed.map(h => (
+                  <tr key={h.id} onClick={() => setSelectedHive(h)} style={{ cursor: 'pointer' }}>
+                    <td><span className="stencil" style={{ fontSize: '1.05rem' }}>{shortCode(h)}</span></td>
+                    <td><span className="badge" style={{ background: 'var(--sunken)', color: 'var(--ink)' }}><span className="dot" style={{ background: STATUS[h.status]?.color }} />{STATUS[h.status]?.label}</span></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {h.status === 'empty' || h.status === 'dead' ? <span className="text-muted">—</span>
+                        : h.queen_present ? (h.queen_age_months ? `${h.queen_age_months} muaj` : 'Po')
+                        : <span className="text-red" style={{ fontWeight: 650 }}>Mungon</span>}
+                    </td>
+                    <td>{h.floor_count || h.floors?.length || 1}</td>
+                    <td style={{ maxWidth: 260 }}>
+                      {h.notes ? <span style={{ display: 'inline-flex', gap: 6, color: 'var(--ink-2)', fontSize: '.86rem' }}><StickyNote size={15} style={{ flexShrink: 0, marginTop: 2 }} />{h.notes}</span> : <span className="text-muted">—</span>}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       </div>
 
-      {/* Hive Detail Modal */}
       {selectedHive && (
-        <HiveDetailModal
-          hive={selectedHive}
-          apiaryId={id}
-          onClose={() => setSelectedHive(null)}
-          onUpdated={(updated) => {
-            handleHiveUpdated(updated)
-            setSelectedHive(null)
-          }}
-        />
+        <HiveDetailModal hive={selectedHive} onClose={() => setSelectedHive(null)}
+          onUpdated={u => { setHives(p => p.map(h => h.id === u.id ? { ...h, ...u } : h)); setSelectedHive(null) }} />
       )}
-
-      {showPlanVisit && (
-        <PlanVisitModal
-          apiaryId={id}
-          onClose={() => setShowPlanVisit(false)}
-          onPlanned={v => { setPlannedVisits(prev => [...prev, v].sort((a, b) => a.visit_date.localeCompare(b.visit_date))); setShowPlanVisit(false) }}
-        />
+      {showPlan && (
+        <PlanVisitModal apiaryId={id} onClose={() => setShowPlan(false)}
+          onPlanned={v => { setPlanned(p => [...p, v].sort((a, b) => a.visit_date.localeCompare(b.visit_date))); setShowPlan(false) }} />
       )}
-
-      {notesHive && (
-        <HiveNotesModal
-          hive={notesHive}
-          onClose={() => setNotesHive(null)}
-          onSaved={updated => { setHives(prev => prev.map(h => h.id === updated.id ? updated : h)); setNotesHive(null) }}
-        />
-      )}
-
-      {/* Delete Confirm Modal */}
-      {showDeleteConfirm && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowDeleteConfirm(false)}>
-          <div className="modal" style={{ maxWidth: '400px' }}>
+      {showDelete && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowDelete(false)}>
+          <div className="modal" role="alertdialog" aria-modal="true" aria-labelledby="del-title" style={{ maxWidth: 420 }}>
             <div className="modal-header">
-              <span className="modal-title">🗑 Fshi Kopsht</span>
-              <button className="modal-close" onClick={() => setShowDeleteConfirm(false)}>✕</button>
+              <h2 className="modal-title" id="del-title">Fshi {apiary?.name}?</h2>
+              <button className="modal-close" onClick={() => setShowDelete(false)} aria-label="Mbyll"><X size={18} /></button>
             </div>
             <div className="modal-body">
-              <p>A jeni i sigurt që doni të fshini kopshtin <strong>{apiary?.name}</strong>? Kjo veprim nuk mund të kthehet.</p>
+              <p>Fshihen {hives.length} koshere, të gjitha vizitat dhe planet e ushqimit të këtij kopshti. Nuk kthehen më.</p>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowDeleteConfirm(false)}>Anulo</button>
-              <button className="btn btn-danger" onClick={handleDeleteApiary}>🗑 Fshi Përgjithmonë</button>
+              <button className="btn btn-ghost" onClick={() => setShowDelete(false)}>Anulo</button>
+              <button className="btn btn-danger" onClick={handleDelete}>Fshi kopshtin</button>
             </div>
           </div>
         </div>
@@ -590,3 +361,42 @@ export default function ApiaryPage() {
     </div>
   )
 }
+
+const APIARY_CSS = `
+.ap-loc { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; }
+.ap-filters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin-bottom: 14px; padding-bottom: 2px; }
+.ap-filters::-webkit-scrollbar { display: none; }
+.ap-filters button {
+  display: inline-flex; align-items: baseline; gap: 6px; flex-shrink: 0;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink-2); font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer;
+}
+.ap-filters button .stencil { font-size: 1.25rem; line-height: 1; color: var(--ink); }
+.ap-filters button[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.ap-filters button[aria-pressed="true"] .stencil { color: var(--ground) !important; }
+
+.ap-yard { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 16px 22px; overflow-x: auto; }
+.ap-row { display: flex; align-items: flex-end; gap: 12px; }
+.ap-row + .ap-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.ap-row-n { width: 18px; font-size: 1.1rem; color: var(--ink-2); padding-bottom: 22px; flex-shrink: 0; text-align: right; }
+.ap-row-hives { display: flex; gap: 6px; align-items: flex-end; }
+.ap-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 16px; font-size: .82rem; color: var(--ink-2); position: sticky; left: 0; }
+.ap-legend .dot { margin-right: 5px; vertical-align: -1px; }
+
+.ap-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px; }
+@media (max-width: 760px) { .ap-cols { grid-template-columns: 1fr; } }
+.ap-plans { list-style: none; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); }
+.ap-plans li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; }
+.ap-plans li + li { border-top: 1px solid var(--line); }
+.ap-plans strong { display: block; text-transform: none; }
+.ap-rel { font-size: .82rem; color: var(--honey-deep); font-weight: 650; }
+.ap-plans p { font-size: .88rem; margin-top: 2px; }
+
+.seg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.seg button {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px;
+  border: 1.5px solid var(--line-strong); border-radius: 10px; background: var(--paper);
+  font: inherit; font-weight: 600; font-size: .92rem; color: var(--ink); cursor: pointer; text-align: left;
+}
+.seg button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: var(--sunken); }
+`

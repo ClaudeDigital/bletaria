@@ -566,11 +566,18 @@ app.get('/api/apiaries', authMiddleware, (req, res) => {
     ORDER BY a.created_at DESC
   `).all(req.user.id);
   
+  const stripStmt = db.prepare(`
+    SELECT h.id, h.status, h.position_row, COALESCE(h.queen_present, 1) q,
+      (SELECT COUNT(*) FROM hive_floors f WHERE f.hive_id = h.id) f
+    FROM hives h WHERE h.apiary_id = ? ORDER BY h.position_row, h.position_col`);
   const apiariesWithStatus = apiaries.map(apiary => {
     const statuses = db.prepare('SELECT status, COUNT(*) as cnt FROM hives WHERE apiary_id = ? GROUP BY status').all(apiary.id);
     const status_summary = { good: 0, problem: 0, dead: 0, empty: 0 };
     statuses.forEach(s => { status_summary[s.status] = s.cnt; });
-    return { ...apiary, status_summary };
+    const hive_strip = stripStmt.all(apiary.id).map(h => ({ id: h.id, s: h.status, f: h.f, q: h.q, r: h.position_row }));
+    const last_visit = db.prepare("SELECT MAX(visit_date) d FROM visits WHERE apiary_id = ? AND status = 'completed'").get(apiary.id).d;
+    const next_visit = db.prepare("SELECT MIN(visit_date) d FROM visits WHERE apiary_id = ? AND status = 'planned' AND visit_date >= date('now')").get(apiary.id).d;
+    return { ...apiary, status_summary, hive_strip, last_visit, next_visit };
   });
   res.json(apiariesWithStatus);
 });
@@ -1797,7 +1804,10 @@ app.get('/api/hives', authMiddleware, (req, res) => {
   const apiary = getOwnedApiary(apiary_id, req.user.id);
   if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
   const hives = db.prepare('SELECT h.*, COALESCE(h.queen_present, 1) as queen_present, h.queen_age_months, h.notes FROM hives h WHERE h.apiary_id = ? ORDER BY h.position_row, h.position_col').all(apiary_id);
-  const hivesWithFloors = hives.map(h => ({ ...h, floors: db.prepare('SELECT * FROM hive_floors WHERE hive_id = ? ORDER BY floor_number').all(h.id), code: h.unique_code }));
+  const hivesWithFloors = hives.map(h => {
+    const floors = db.prepare('SELECT * FROM hive_floors WHERE hive_id = ? ORDER BY floor_number').all(h.id);
+    return { ...h, floors, floor_count: floors.length, code: h.unique_code };
+  });
   res.json(hivesWithFloors);
 });
 app.get('/api/hives/:id', authMiddleware, (req, res) => {

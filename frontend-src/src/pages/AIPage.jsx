@@ -1,19 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
+import { Sparkles, SendHorizontal } from 'lucide-react'
 import { aiAPI } from '../api'
 import { useAuth } from '../context/AuthContext'
 
 const WELCOME_MSG = {
   id: 0,
   role: 'assistant',
-  content: `Mirë se erdhe! 🐝 Unë jam **Bletari AI**, asistenti yt i inteligjencës artificiale i specializuar për bletarinë.
+  content: `Mirë se erdhe! Unë jam **Bletari AI**, asistenti yt i inteligjencës artificiale i specializuar për bletarinë.
 
 Mund të pyesni për:
-• 🦠 **Sëmundje** dhe trajtimin e tyre (Varroa, Nosema, AFB, EFB...)
-• 🌿 **Ushqim dhe ilaçim** organik dhe kimik
-• 📅 **Sezonaliteti** — çfarë të bësh gjatë çdo stine
-• 🏗 **Menaxhimi** i kopshtit dhe koshereve
-• 🍯 **Prodhimi i mjaltit** dhe produkteve të tjera
-• 👑 **Mbretëresha** — mbarështimi dhe zëvendësimi
+• **Sëmundje** dhe trajtimin e tyre (Varroa, Nosema, AFB, EFB...)
+• **Ushqim dhe ilaçim** organik dhe kimik
+• **Sezonaliteti** — çfarë të bësh gjatë çdo stine
+• **Menaxhimi** i kopshtit dhe koshereve
+• **Prodhimi i mjaltit** dhe produkteve të tjera
+• **Mbretëresha** — mbarështimi dhe zëvendësimi
 
 Si mund të të ndihmoj sot?`,
   time: new Date().toISOString(),
@@ -57,14 +58,14 @@ function Message({ msg }) {
           width: '36px',
           height: '36px',
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--gold), var(--wood))',
+          background: 'var(--ink)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '1.1rem',
+          color: 'var(--honey)',
           flexShrink: 0,
         }}>
-          🐝
+          <Sparkles size={18} />
         </div>
       )}
 
@@ -74,12 +75,12 @@ function Message({ msg }) {
         borderRadius: isUser
           ? '18px 18px 4px 18px'
           : '4px 18px 18px 18px',
-        background: isUser ? 'var(--gold)' : 'var(--card)',
-        color: isUser ? '#2C1810' : 'var(--text)',
+        background: isUser ? 'var(--ink)' : 'var(--card)',
+        color: isUser ? 'var(--ground)' : 'var(--text)',
         border: isUser ? 'none' : '1px solid var(--border)',
         fontSize: '0.9rem',
         lineHeight: 1.7,
-        boxShadow: '0 1px 4px var(--shadow)',
+        
       }}>
         {renderContent(msg.content)}
         <div style={{
@@ -88,27 +89,10 @@ function Message({ msg }) {
           opacity: 0.6,
           textAlign: isUser ? 'right' : 'left',
         }}>
-          {new Date(msg.time).toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' })}
+          {new Date(msg.time).toTimeString().slice(0, 5)}
         </div>
       </div>
 
-      {isUser && (
-        <div style={{
-          width: '36px',
-          height: '36px',
-          borderRadius: '50%',
-          background: 'var(--wood)',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '0.9rem',
-          fontWeight: 700,
-          flexShrink: 0,
-        }}>
-          👤
-        </div>
-      )}
     </div>
   )
 }
@@ -120,14 +104,14 @@ function TypingIndicator() {
         width: '36px',
         height: '36px',
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, var(--gold), var(--wood))',
+        background: 'var(--ink)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: '1.1rem',
+        color: 'var(--honey)',
         flexShrink: 0,
       }}>
-        🐝
+        <Sparkles size={18} />
       </div>
       <div style={{
         padding: '0.75rem 1rem',
@@ -243,7 +227,7 @@ export default function AIPage() {
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      height: 'calc(100vh - 64px)',
+      height: 'calc(100dvh - var(--nav-h) - (var(--tabbar-h) * var(--has-tabbar, 0)))',
       maxWidth: '780px',
       margin: '0 auto',
       padding: '0 1rem',
@@ -263,19 +247,19 @@ export default function AIPage() {
             width: '44px',
             height: '44px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--gold), var(--wood))',
+            background: 'var(--ink)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '1.4rem',
+            color: 'var(--honey)',
           }}>
-            🐝
+            <Sparkles size={22} />
           </div>
           <div>
-            <h2 style={{ fontSize: '1rem', marginBottom: '0.1rem' }}>Bletari AI 🤖</h2>
+            <h1 style={{ fontSize: '1.15rem', marginBottom: '0.1rem' }}>Asistenti i bletarit</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--green)' }}>
               <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
-              Online
+              Përgjigjet në shqip
             </div>
           </div>
         </div>
@@ -291,14 +275,14 @@ export default function AIPage() {
             color: isLimited ? 'var(--red)' : 'var(--green)',
             fontWeight: 600,
           }}>
-            {isLimited ? '⛔ Limit i arritur' : `🔢 ${remaining}/${FREE_LIMIT} kërkesa`}
+            {isLimited ? 'Limit i arritur' : `${remaining}/${FREE_LIMIT} kërkesa`}
           </div>
           <button
             className="btn btn-ghost btn-sm"
             onClick={() => setMessages([WELCOME_MSG])}
             title="Bisedë e re"
           >
-            🔄 E re
+            E re
           </button>
         </div>
       </div>
@@ -319,7 +303,7 @@ export default function AIPage() {
       {/* Quick Questions */}
       {messages.length <= 1 && !loading && (
         <div style={{ paddingBottom: '0.75rem' }}>
-          <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>💡 Pyetje të shpejta:</p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>Pyetje të shpejta:</p>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
             {QUICK_QUESTIONS.map(q => (
               <button
@@ -355,7 +339,7 @@ export default function AIPage() {
           marginBottom: '0.75rem',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>⛔</div>
+          
           <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--red)', marginBottom: '0.25rem' }}>
             Limite ditore e arritur
           </div>
@@ -363,7 +347,7 @@ export default function AIPage() {
             Ke përdorur {FREE_LIMIT}/{FREE_LIMIT} pyetje falas sot. Limiti riset nesër, ose abonohu Premium për pyetje të pakufizuara.
           </div>
           <button className="btn btn-primary btn-sm" style={{ marginTop: '0.5rem' }}>
-            ⭐ Abono Premium — €4.99/muaj
+            Abono Premium — €4.99/muaj
           </button>
         </div>
       )}
@@ -380,7 +364,7 @@ export default function AIPage() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isLimited ? 'Limite e arritur...' : '💬 Pyete Bletari AI...'}
+            placeholder={isLimited ? 'Limite e arritur...' : 'Pyete Bletari AI...'}
             disabled={loading || isLimited}
             rows={1}
             style={{
@@ -416,11 +400,11 @@ export default function AIPage() {
               flexShrink: 0,
             }}
           >
-            {loading ? '⏳' : '➤'}
+            <SendHorizontal size={20} color={loading || !input.trim() || isLimited ? 'var(--ink-2)' : '#1E2B22'} />
           </button>
         </div>
         <p style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '0.35rem', textAlign: 'center' }}>
-          Enter për dërgim · Shift+Enter për rresht të ri
+          Enter dërgon, Shift+Enter kalon në rresht të ri
         </p>
       </div>
     </div>

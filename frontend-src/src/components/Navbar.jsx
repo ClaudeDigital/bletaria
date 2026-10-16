@@ -1,20 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-
-function CoffeeIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 8h1a4 4 0 010 8h-1"/>
-      <path d="M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8z"/>
-      <line x1="6" y1="2" x2="6" y2="4"/>
-      <line x1="10" y1="2" x2="10" y2="4"/>
-      <line x1="14" y1="2" x2="14" y2="4"/>
-    </svg>
-  )
-}
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Bell, Moon, Sun, Coffee, LayoutGrid, Users, Store, Sparkles, UserRound, BarChart3, LogOut, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { notifAPI } from '../api'
+import { fmtDate } from '../lib/format'
 
 function NotificationBell({ userId }) {
   const [open, setOpen] = useState(false)
@@ -30,130 +20,63 @@ function NotificationBell({ userId }) {
     } catch {}
   }
 
-  const fetchAll = async () => {
-    setLoading(true)
-    try {
-      const res = await notifAPI.list()
-      setNotifs(res.data || [])
-      setUnread(0)
-      await notifAPI.markAllRead()
-    } catch {} finally { setLoading(false) }
-  }
-
   useEffect(() => {
     if (!userId) return
     fetchCount()
-    const interval = setInterval(fetchCount, 60000)
-    return () => clearInterval(interval)
+    const t = setInterval(fetchCount, 60000)
+    return () => clearInterval(t)
   }, [userId])
 
   useEffect(() => {
-    if (open) fetchAll()
+    if (!open) return
+    setLoading(true)
+    notifAPI.list()
+      .then(res => { setNotifs(res.data || []); setUnread(0); return notifAPI.markAllRead() })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [open])
 
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  const handleDelete = async (e, id) => {
-    e.stopPropagation()
-    await notifAPI.delete(id)
+  const remove = async (id) => {
+    try { await notifAPI.delete(id) } catch {}
     setNotifs(prev => prev.filter(n => n.id !== id))
   }
 
-  const typeIcon = (type) => ({ visit: '📅', info: 'ℹ️', warning: '⚠️', success: '✅' }[type] || '🔔')
-
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          position: 'relative',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '50%',
-          width: '36px',
-          height: '36px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '1rem',
-          transition: 'var(--transition)',
-        }}
-        title="Njoftimet"
-      >
-        🔔
-        {unread > 0 && (
-          <span style={{
-            position: 'absolute',
-            top: '-4px', right: '-4px',
-            background: '#C0392B',
-            color: 'white',
-            borderRadius: '50%',
-            width: '18px', height: '18px',
-            fontSize: '0.65rem',
-            fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '2px solid var(--card)',
-          }}>{unread > 9 ? '9+' : unread}</span>
-        )}
+      <button className="icon-btn" onClick={() => setOpen(o => !o)} aria-label={unread ? `Njoftimet, ${unread} të palexuara` : 'Njoftimet'}>
+        <Bell size={20} />
+        {unread > 0 && <span className="count">{unread > 9 ? '9+' : unread}</span>}
       </button>
-
       {open && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 899 }} onClick={() => setOpen(false)} />
-          <div style={{
-            position: 'absolute', right: 0, top: '110%',
-            background: 'var(--card)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)', boxShadow: '0 8px 24px var(--shadow-md)',
-            width: '320px', maxWidth: '90vw', zIndex: 901, overflow: 'hidden',
-          }}>
-            <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>🔔 Njoftimet</span>
-              {notifs.length > 0 && (
-                <button onClick={() => setNotifs([])} style={{ background: 'none', border: 'none', fontSize: '0.75rem', color: 'var(--muted)', cursor: 'pointer' }}>
-                  Fshi të gjitha
+        <div className="menu-pop" style={{ width: 340, maxWidth: 'calc(100vw - 24px)', right: -48 }}>
+          <div style={{ padding: '14px 16px', fontWeight: 750, borderBottom: '1px solid var(--line)' }}>Njoftimet</div>
+          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+            {loading ? (
+              <p style={{ padding: 24, textAlign: 'center', fontSize: '.9rem' }}>Duke ngarkuar…</p>
+            ) : notifs.length === 0 ? (
+              <p style={{ padding: 24, textAlign: 'center', fontSize: '.9rem' }}>Asnjë njoftim. Këtu të kujtojmë vizitat e planifikuara.</p>
+            ) : notifs.map(n => (
+              <div key={n.id} style={{ display: 'flex', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {n.link
+                    ? <Link to={n.link} onClick={() => setOpen(false)} style={{ fontWeight: 650, color: 'var(--ink)', padding: 0 }}>{n.title}</Link>
+                    : <div style={{ fontWeight: 650 }}>{n.title}</div>}
+                  {n.message && <div style={{ fontSize: '.84rem', color: 'var(--ink-2)', marginTop: 2 }}>{n.message}</div>}
+                  <div style={{ fontSize: '.76rem', color: 'var(--ink-2)', marginTop: 4 }}>{fmtDate(n.created_at)}</div>
+                </div>
+                <button className="icon-btn" style={{ width: 32, height: 32 }} onClick={() => remove(n.id)} aria-label="Fshi njoftimin">
+                  <X size={16} />
                 </button>
-              )}
-            </div>
-            <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-              {loading ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>Duke ngarkuar...</div>
-              ) : notifs.length === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔕</div>
-                  Nuk ke njoftime
-                </div>
-              ) : notifs.map(n => (
-                <div key={n.id} style={{
-                  padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)',
-                  background: n.read ? 'var(--card)' : 'rgba(245,166,35,0.05)',
-                  display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
-                }}>
-                  <span style={{ fontSize: '1.1rem', flexShrink: 0, marginTop: '2px' }}>{typeIcon(n.type)}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {n.link ? (
-                      <Link to={n.link} onClick={() => setOpen(false)}
-                        style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text)', textDecoration: 'none', display: 'block', marginBottom: '0.2rem' }}>
-                        {n.title}
-                      </Link>
-                    ) : (
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.2rem' }}>{n.title}</div>
-                    )}
-                    {n.message && <div style={{ fontSize: '0.78rem', color: 'var(--muted)', lineHeight: 1.4 }}>{n.message}</div>}
-                    <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '0.25rem' }}>
-                      {new Date(n.created_at).toLocaleDateString('sq-AL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-                  <button onClick={e => handleDelete(e, n.id)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0, padding: '2px 4px' }}>✕</button>
-                </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -163,215 +86,114 @@ export default function Navbar() {
   const { user, logout, isAuthenticated, isAdmin } = useAuth()
   const { toggleTheme, isDark } = useTheme()
   const navigate = useNavigate()
-  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
 
   const handleLogout = () => {
+    setMenuOpen(false)
     logout()
     navigate('/')
-    setDropdownOpen(false)
-    setMenuOpen(false)
   }
 
-  const isActive = (path) => location.pathname === path
+  const links = !isAuthenticated
+    ? [
+        { to: '/community', label: 'Komuniteti', Icon: Users },
+        { to: '/marketplace', label: 'Tregu', Icon: Store },
+      ]
+    : isAdmin
+      ? [
+          { to: '/admin', label: 'Paneli', Icon: BarChart3 },
+          { to: '/community', label: 'Komuniteti', Icon: Users },
+          { to: '/marketplace', label: 'Tregu', Icon: Store },
+        ]
+      : [
+          { to: '/dashboard', label: 'Kopshtet', Icon: LayoutGrid },
+          { to: '/community', label: 'Komuniteti', Icon: Users },
+          { to: '/marketplace', label: 'Tregu', Icon: Store },
+          { to: '/ai', label: 'Asistenti', Icon: Sparkles },
+        ]
 
-  const publicLinks = [
-    { to: '/community', label: 'Komuniteti' },
-    { to: '/marketplace', label: 'Tregu' },
-  ]
-
-  const privateLinks = isAdmin ? [
-    { to: '/admin', label: 'Paneli' },
-    { to: '/community', label: 'Komuniteti' },
-    { to: '/marketplace', label: 'Tregu' },
-  ] : [
-    { to: '/dashboard', label: 'Kopshtet' },
-    { to: '/community', label: 'Komuniteti' },
-    { to: '/marketplace', label: 'Tregu' },
-    { to: '/ai', label: 'Bletari AI' },
-  ]
+  const first = user?.name?.split(' ')[0] || 'Bletari'
 
   return (
-    <nav style={{
-      background: 'var(--card)',
-      borderBottom: '1px solid var(--border)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-      backdropFilter: 'blur(10px)',
-    }}>
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '0 1rem',
-        height: '64px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '1.5rem',
-      }}>
-        {/* Logo */}
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flexShrink: 0, marginTop: '4px' }}>
-          <img src="/logo.png" className="logo-full" style={{ height: '94px', width: 'auto', display: 'block' }} alt="Bletaria Ime" />
-          <img src="/bleta.png" className="logo-b" style={{ width: '42px', height: '42px', objectFit: 'contain', display: 'none' }} alt="Bletaria Ime" />
-        </Link>
-
-        {/* Desktop Nav */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }} className="desktop-nav">
-          {isAuthenticated
-            ? privateLinks.map(l => (
-                <Link key={l.to} to={l.to} style={{
-                  fontSize: '0.9rem', fontWeight: 600,
-                  color: isActive(l.to) ? 'var(--gold)' : 'var(--muted)',
-                  textDecoration: 'none', transition: 'color 0.2s',
-                }}
-                  onMouseEnter={e => e.target.style.color = 'var(--text)'}
-                  onMouseLeave={e => e.target.style.color = isActive(l.to) ? 'var(--gold)' : 'var(--muted)'}
-                >{l.label}</Link>
-              ))
-            : publicLinks.map(l => (
-                <Link key={l.to} to={l.to} style={{
-                  fontSize: '0.9rem', fontWeight: 600,
-                  color: isActive(l.to) ? 'var(--gold)' : 'var(--muted)',
-                  textDecoration: 'none',
-                }}>{l.label}</Link>
-              ))
-          }
-        </div>
-
-        {/* Right side */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {/* Theme Toggle */}
-          <button onClick={toggleTheme} style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1rem', transition: 'var(--transition)',
-          }} title={isDark ? 'Mënyra e ditës' : 'Mënyra e natës'}>
-            {isDark ? '☀️' : '🌙'}
-          </button>
-
-          <Link to="/donate" title="Mbështet platformën me një kafe" style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--muted)', transition: 'var(--transition)', textDecoration: 'none',
-            flexShrink: 0,
-          }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--gold)'; e.currentTarget.style.borderColor = 'var(--gold)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-          >
-            <CoffeeIcon />
+    <>
+      <header className="site-nav">
+        <div className="container site-nav-inner">
+          <Link to={isAuthenticated ? (isAdmin ? '/admin' : '/dashboard') : '/'} className="brand" aria-label="Bletaria Ime, faqja kryesore">
+            <img src="/bleta.png" alt="" />
+            <span className="brand-word">Bletaria <span>ime</span></span>
           </Link>
 
-          {isAuthenticated && <NotificationBell userId={user?.id} />}
+          <nav className="nav-links" aria-label="Navigimi kryesor">
+            {links.map(l => (
+              <NavLink key={l.to} to={l.to} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{l.label}</NavLink>
+            ))}
+          </nav>
 
-          {isAuthenticated ? (
-            <div style={{ position: 'relative' }}>
-              <button onClick={() => setDropdownOpen(!dropdownOpen)} style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: '30px', padding: '0.35rem 0.75rem 0.35rem 0.35rem',
-                cursor: 'pointer', transition: 'var(--transition)',
-              }}>
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '50%',
-                  background: 'var(--gold)', color: 'white', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: '0.8rem',
-                }}>
-                  {user?.name?.charAt(0)?.toUpperCase() || 'B'}
-                </div>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {user?.name?.split(' ')[0] || 'Bletari'}
-                </span>
-                <span style={{ color: 'var(--muted)', fontSize: '0.7rem' }}>▼</span>
-              </button>
+          <div className="nav-right">
+            <button className="icon-btn" onClick={toggleTheme} aria-label={isDark ? 'Kalo në pamjen e ditës' : 'Kalo në pamjen e natës'}>
+              {isDark ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <Link to="/donate" className="icon-btn nav-desktop-only" aria-label="Mbështet platformën">
+              <Coffee size={20} />
+            </Link>
 
-              {dropdownOpen && (
-                <>
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 899 }} onClick={() => setDropdownOpen(false)} />
-                  <div style={{
-                    position: 'absolute', right: 0, top: '110%',
-                    background: 'var(--card)', border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)', boxShadow: '0 8px 24px var(--shadow-md)',
-                    minWidth: '180px', zIndex: 901, overflow: 'hidden',
-                  }}>
-                    {[
-                      { to: '/profile', label: 'Profili Im' },
-                      isAdmin ? { to: '/admin', label: 'Paneli i Adminit' } : { to: '/dashboard', label: 'Kopshtet e Mia' },
-                    ].map(item => (
-                      <Link key={item.to} to={item.to} onClick={() => setDropdownOpen(false)} style={{
-                        display: 'flex', alignItems: 'center', gap: '0.5rem',
-                        padding: '0.75rem 1rem', color: 'var(--text)',
-                        textDecoration: 'none', fontSize: '0.9rem', transition: 'background 0.15s',
-                      }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >{item.label}</Link>
-                    ))}
-                    <div style={{ height: '1px', background: 'var(--border)' }} />
-                    <button onClick={handleLogout} style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem',
-                      padding: '0.75rem 1rem', color: 'var(--red)',
-                      background: 'none', border: 'none', width: '100%',
-                      textAlign: 'left', cursor: 'pointer', fontSize: '0.9rem',
-                      fontFamily: 'var(--font)', transition: 'background 0.15s',
-                    }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >Dil</button>
+            {isAuthenticated && <NotificationBell userId={user?.id} />}
+
+            {isAuthenticated ? (
+              <div ref={menuRef} style={{ position: 'relative' }}>
+                <button onClick={() => setMenuOpen(o => !o)} aria-expanded={menuOpen} aria-haspopup="menu"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 10px 4px 4px', border: '1px solid var(--line)', borderRadius: 999, background: 'var(--paper)', cursor: 'pointer', font: 'inherit', color: 'var(--ink)' }}>
+                  <span className="avatar" style={{ width: 30, height: 30, fontSize: '.82rem' }}>
+                    {user?.avatar ? <img src={user.avatar} alt="" /> : first.charAt(0).toUpperCase()}
+                  </span>
+                  <span style={{ fontWeight: 650, fontSize: '.9rem', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{first}</span>
+                </button>
+                {menuOpen && (
+                  <div className="menu-pop" role="menu">
+                    <div style={{ padding: '14px 16px 10px' }}>
+                      <div style={{ fontWeight: 750 }}>{user?.name}</div>
+                      <div style={{ fontSize: '.82rem', color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
+                    </div>
+                    <div className="sep" />
+                    <Link to="/profile" onClick={() => setMenuOpen(false)}><UserRound size={18} /> Profili</Link>
+                    {isAdmin
+                      ? <Link to="/admin" onClick={() => setMenuOpen(false)}><BarChart3 size={18} /> Paneli i adminit</Link>
+                      : <Link to="/dashboard" onClick={() => setMenuOpen(false)}><LayoutGrid size={18} /> Kopshtet e mia</Link>}
+                    <Link to="/donate" onClick={() => setMenuOpen(false)}><Coffee size={18} /> Mbështet platformën</Link>
+                    <div className="sep" />
+                    <button className="danger" onClick={handleLogout}><LogOut size={18} /> Dil</button>
                   </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Link to="/login" className="btn btn-ghost btn-sm">Hyr</Link>
-              <Link to="/register" className="btn btn-primary btn-sm register-btn">Regjistrohu</Link>
-            </div>
-          )}
-
-          {/* Hamburger */}
-          <button onClick={() => setMenuOpen(!menuOpen)} className="hamburger" style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            padding: '0.25rem', color: 'var(--text)', fontSize: '1.4rem', display: 'none',
-          }}>
-            {menuOpen ? '✕' : '☰'}
-          </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <Link to="/login" className="btn btn-ghost btn-sm">Hyr</Link>
+                <Link to="/register" className="btn btn-primary btn-sm nav-desktop-only">Krijo llogari</Link>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Mobile Menu */}
-      {menuOpen && (
-        <div style={{ background: 'var(--card)', borderTop: '1px solid var(--border)', padding: '1rem' }}>
-          {(isAuthenticated ? privateLinks : publicLinks).map(l => (
-            <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)} style={{
-              display: 'block', padding: '0.75rem',
-              color: isActive(l.to) ? 'var(--gold)' : 'var(--text)',
-              textDecoration: 'none', fontWeight: 600,
-              borderRadius: 'var(--radius-sm)', marginBottom: '0.25rem',
-            }}>{l.label}</Link>
-          ))}
-          {!isAuthenticated && (
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-              <Link to="/login" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setMenuOpen(false)}>Hyr</Link>
-              <Link to="/register" className="btn btn-primary" style={{ flex: 1 }} onClick={() => setMenuOpen(false)}>Regjistrohu</Link>
-            </div>
-          )}
-        </div>
+      {isAuthenticated && (
+        <nav className="tabbar" aria-label="Navigimi në telefon">
+          <div className="tabbar-inner">
+            {[...links, { to: '/profile', label: 'Profili', Icon: UserRound }].map(({ to, label, Icon }) => (
+              <NavLink key={to} to={to} className={({ isActive }) => isActive ? 'active' : ''}>
+                <Icon size={22} strokeWidth={1.9} />
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
       )}
-
-      <style>{`
-        @media (max-width: 768px) {
-          .desktop-nav { display: none !important; }
-          .hamburger { display: flex !important; }
-          .register-btn { display: none !important; }
-          .logo-full { display: none !important; }
-          .logo-b { display: block !important; }
-        }
-      `}</style>
-    </nav>
+    </>
   )
 }

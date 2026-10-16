@@ -1,5 +1,7 @@
 import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
+import { fmtDate } from '../lib/format'
 import { useParams, Link } from 'react-router-dom'
 import { apiaryAPI, hiveAPI, feedingAPI } from '../api'
 
@@ -55,21 +57,21 @@ function AddPlanModal({ apiaryId, hives, onClose, onAdded }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: '600px' }}>
         <div className="modal-header">
-          <span className="modal-title">🌿 Plan i Ri Ushqimi</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <span className="modal-title">Plan i ri ushqimi</span>
+          <button className="modal-close" onClick={onClose} aria-label="Mbyll">×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-error">⚠️ {error}</div>}
+            {error && <div className="alert alert-error">{error}</div>}
 
             <div className="form-group">
-              <label className="form-label">📅 Data</label>
+              <label className="form-label">Data</label>
               <input type="date" className="form-control" value={form.plan_date}
                 onChange={e => setForm(p => ({ ...p, plan_date: e.target.value }))} />
             </div>
 
             <div className="form-group">
-              <label className="form-label">📝 Përshkrimi i planit</label>
+              <label className="form-label">Përshkrimi i planit</label>
               <textarea className="form-control" rows={2} value={form.description}
                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 placeholder="p.sh. Ushqim vjeshtë me shurup sheqeri..." />
@@ -77,13 +79,13 @@ function AddPlanModal({ apiaryId, hives, onClose, onAdded }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
-                <label className="form-label">🌿 Ushqimi / Sasia</label>
+                <label className="form-label">Ushqimi / Sasia</label>
                 <input type="text" className="form-control" value={form.food_amount}
                   onChange={e => setForm(p => ({ ...p, food_amount: e.target.value }))}
                   placeholder="p.sh. 500ml shurup sheqeri" />
               </div>
               <div className="form-group">
-                <label className="form-label">💊 Ilaçi / Trajtimi</label>
+                <label className="form-label">Ilaçi / Trajtimi</label>
                 <input type="text" className="form-control" value={form.medicine}
                   onChange={e => setForm(p => ({ ...p, medicine: e.target.value }))}
                   placeholder="p.sh. Api-Life Var, Oxalic acid" />
@@ -118,7 +120,7 @@ function AddPlanModal({ apiaryId, hives, onClose, onAdded }) {
                         color: sel ? 'var(--green)' : 'var(--muted)',
                         transition: 'all 0.15s',
                       }}
-                    >{sel ? '✅ ' : ''}{h.code}</button>
+                    >{sel ? '✓ ' : ''}{h.code}</button>
                   )
                 })}
               </div>
@@ -128,14 +130,14 @@ function AddPlanModal({ apiaryId, hives, onClose, onAdded }) {
             {form.selected_hives.length > 0 && (
               <div>
                 <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                  📋 Shënime specifike per koshère <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(opsionale)</span>
+                  Shënime specifike per koshère <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(opsionale)</span>
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {form.selected_hives.map(hiveId => {
                     const hive = hives.find(h => h.id === hiveId)
                     return (
                       <div key={hiveId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span style={{ minWidth: '64px', fontWeight: 700, fontSize: '0.85rem' }}>🐝 {hive?.code}</span>
+                        <span style={{ minWidth: '64px', fontWeight: 700, fontSize: '0.85rem' }}>{hive?.code}</span>
                         <input type="text" className="form-control"
                           placeholder="Shënim specifik për këtë koshère..."
                           value={form.hive_notes[hiveId] || ''}
@@ -151,7 +153,7 @@ function AddPlanModal({ apiaryId, hives, onClose, onAdded }) {
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>Anulo</button>
             <button type="submit" className="btn btn-green" disabled={loading}>
-              {loading ? '⏳' : '💾 Ruaj Planin'}
+              {loading ? 'Duke ruajtur…' : 'Ruaj planin'}
             </button>
           </div>
         </form>
@@ -172,15 +174,15 @@ function PlanCard({ plan, onDelete }) {
       }}>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ background: 'rgba(74,124,89,0.1)', color: 'var(--green)', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', fontWeight: 700 }}>
-            📅 {plan.plan_date ? new Date(plan.plan_date).toLocaleDateString('sq-AL') : '—'}
+            {fmtDate(plan.plan_date)}
           </div>
           <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{plan.description || 'Plan Ushqimi'}</span>
-          {plan.food_amount && <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>🌿 {plan.food_amount}</span>}
-          {plan.medicine && <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>💊 {plan.medicine}</span>}
-          <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>🐝 {plan.hive_plans?.length || plan.hive_count || 0} koshere</span>
+          {plan.food_amount && <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{plan.food_amount}</span>}
+          {plan.medicine && <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{plan.medicine}</span>}
+          <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{plan.hive_plans?.length || plan.hive_count || 0} koshere</span>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button onClick={e => { e.stopPropagation(); onDelete(plan.id) }} className="btn btn-danger btn-sm">🗑</button>
+          <button onClick={e => { e.stopPropagation(); onDelete(plan.id) }} className="btn btn-ghost btn-sm btn-icon" aria-label="Fshi planin"><Trash2 size={16} /></button>
           <span style={{ color: 'var(--muted)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
         </div>
       </div>
@@ -193,8 +195,8 @@ function PlanCard({ plan, onDelete }) {
               borderBottom: i < plan.hive_plans.length - 1 ? '1px solid var(--border)' : 'none',
               fontSize: '0.82rem', alignItems: 'center', flexWrap: 'wrap',
             }}>
-              <span style={{ fontWeight: 700, minWidth: '64px' }}>🐝 {hp.hive_code || `#${hp.hive_id}`}</span>
-              {hp.notes && <span style={{ color: 'var(--muted)' }}>📝 {hp.notes}</span>}
+              <span style={{ fontWeight: 700, minWidth: '64px' }}>{hp.hive_code || `#${hp.hive_id}`}</span>
+              {hp.notes && <span style={{ color: 'var(--muted)' }}>{hp.notes}</span>}
             </div>
           ))}
         </div>
@@ -243,27 +245,27 @@ export default function FeedingPage() {
     <div className="page-content">
       <div className="container" style={{ maxWidth: '800px' }}>
         <nav className="breadcrumb">
-          <Link to="/dashboard">🏠 Dashboard</Link>
-          <span className="breadcrumb-sep">›</span>
-          <Link to={`/apiary/${apiaryId}`}>🏡 {apiary?.name}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>🌿 Plan Ushqimi</span>
+          <Link to="/dashboard">Kopshtet</Link>
+          <span className="breadcrumb-sep">/</span>
+          <Link to={`/apiary/${apiaryId}`}>{apiary?.name}</Link>
+          <span className="breadcrumb-sep">/</span>
+          <span>Plan Ushqimi</span>
         </nav>
 
         <div className="page-header">
           <div>
-            <h1 className="page-title">🌿 Planet e Ushqimit</h1>
+            <h1 className="page-title">Ushqimi dhe trajtimi</h1>
             <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Ushqim, ilaçim dhe kujdesi për bletët</p>
           </div>
-          <button className="btn btn-green" onClick={() => setShowAddModal(true)}>+ Plan i Ri</button>
+          <button className="btn btn-green" onClick={() => setShowAddModal(true)}><Plus size={18} /> Plan i ri</button>
         </div>
 
         {plans.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🌿</div>
+            <div className="empty-state-icon"></div>
             <h3>Nuk ka plane ushqimi</h3>
             <p style={{ marginBottom: '1.5rem' }}>Krijo planin e parë të ushqimit për kopshtin tënd</p>
-            <button className="btn btn-green btn-lg" onClick={() => setShowAddModal(true)}>🌿 Krijo Plan të Parë</button>
+            <button className="btn btn-green btn-lg" onClick={() => setShowAddModal(true)}>Krijo Plan të Parë</button>
           </div>
         ) : (
           <div>
