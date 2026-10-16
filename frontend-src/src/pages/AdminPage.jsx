@@ -1,6 +1,8 @@
 import PageLoader from '../components/PageLoader'
 import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { adminAuthAPI, adminDataAPI } from '../api'
+import { useAuth } from '../context/AuthContext'
 
 function AdminLogin({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '' })
@@ -55,6 +57,9 @@ function AdminLogin({ onLogin }) {
               {loading ? '⏳ Duke hyrë...' : '🔐 Hyr në Admin'}
             </button>
           </form>
+          <div style={{ padding: '0 2rem 1.5rem', textAlign: 'center', fontSize: '0.85rem' }}>
+            <Link to="/login" style={{ color: 'var(--gold)', fontWeight: 600 }}>Hyr me llogarinë e adminit →</Link>
+          </div>
         </div>
       </div>
     </div>
@@ -63,290 +68,204 @@ function AdminLogin({ onLogin }) {
 
 // --- Subcomponents ---
 
-function StatsTab() {
-  const [stats, setStats] = useState(null)
+const fmtDate = (d) => {
+  if (!d) return '—'
+  const x = new Date(String(d).replace(' ', 'T'))
+  return isNaN(x) ? '—' : `${String(x.getDate()).padStart(2, '0')}.${String(x.getMonth() + 1).padStart(2, '0')}.${x.getFullYear()}`
+}
+const MONTHS = ['Jan', 'Shk', 'Mar', 'Pri', 'Maj', 'Qer', 'Kor', 'Gus', 'Sht', 'Tet', 'Nën', 'Dhj']
 
-  useEffect(() => {
-    adminDataAPI.stats()
-      .then(res => setStats(res.data))
-      .catch(() => setStats({
-        users: 247, active_users: 198,
-        apiaries: 412, hives: 3840,
-        visits_today: 18, visits_week: 89,
-        posts: 1024, listings: 56,
-      }))
-  }, [])
+const HIVE_STATUS = [
+  { key: 'good', label: 'Mirë', color: 'var(--green)' },
+  { key: 'problem', label: 'Me probleme', color: 'var(--gold)' },
+  { key: 'dead', label: 'Të vdekura', color: 'var(--red)' },
+  { key: 'empty', label: 'Bosh', color: '#bdbdbd' },
+]
 
-  if (!stats) return <PageLoader />
-
-  const cards = [
-    { icon: '👥', label: 'Perdorues', value: stats.users, sub: `${stats.active_users} aktiv` },
-    { icon: '🏡', label: 'Kopshte', value: stats.apiaries },
-    { icon: '🐝', label: 'Koshere', value: stats.hives },
-    { icon: '📅', label: 'Vizita sot', value: stats.visits_today, sub: `${stats.visits_week} këtë javë` },
-    { icon: '💬', label: 'Postime', value: stats.posts },
-    { icon: '🛒', label: 'Listime', value: stats.listings },
-  ]
-
+function Section({ title, children }) {
   return (
-    <div>
-      <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>📊 Statistikat e Sistemit</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
-        {cards.map(c => (
-          <div key={c.label} className="card card-body" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>{c.icon}</div>
-            <div style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--gold)', lineHeight: 1 }}>{c.value}</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '0.25rem' }}>{c.label}</div>
-            {c.sub && <div style={{ fontSize: '0.72rem', color: 'var(--green)' }}>{c.sub}</div>}
-          </div>
-        ))}
-      </div>
+    <div style={{ marginTop: '1.75rem' }}>
+      <h3 style={{ fontSize: '0.95rem', marginBottom: '0.75rem' }}>{title}</h3>
+      {children}
     </div>
   )
 }
 
-function NewsTab() {
-  const [news, setNews] = useState([])
-  const [showForm, setShowForm] = useState(false)
-  const [editItem, setEditItem] = useState(null)
-  const [form, setForm] = useState({ title: '', excerpt: '', content: '', category: 'Lajme' })
-  const [loading, setLoading] = useState(true)
+function StatsTab() {
+  const [stats, setStats] = useState(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    adminDataAPI.newsList()
-      .then(res => setNews(res.data.news || []))
-      .catch(() => setNews([
-        { id: 1, title: 'Sezoni i pranverës', category: 'Këshilla', date: '2026-04-15', published: true },
-        { id: 2, title: 'Varroa destructor', category: 'Shëndet', date: '2026-04-10', published: true },
-      ]))
-      .finally(() => setLoading(false))
+    adminDataAPI.stats()
+      .then(res => setStats(res.data))
+      .catch(() => setError('Statistikat nuk u ngarkuan.'))
   }, [])
 
-  const handleSave = async () => {
-    setLoading(true)
-    try {
-      if (editItem) {
-        await adminDataAPI.updateNews(editItem.id, form)
-        setNews(prev => prev.map(n => n.id === editItem.id ? { ...n, ...form } : n))
-      } else {
-        const res = await adminDataAPI.createNews(form)
-        setNews(prev => [res.data.news || { id: Date.now(), ...form, date: new Date().toISOString().slice(0, 10), published: true }, ...prev])
-      }
-    } catch {}
-    setShowForm(false)
-    setEditItem(null)
-    setForm({ title: '', excerpt: '', content: '', category: 'Lajme' })
-    setLoading(false)
-  }
+  if (error) return <div className="alert alert-error">⚠️ {error}</div>
+  if (!stats) return <PageLoader />
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Fshi lajmin?')) return
-    try {
-      await adminDataAPI.deleteNews(id)
-    } catch {}
-    setNews(prev => prev.filter(n => n.id !== id))
-  }
+  const cards = [
+    { label: 'Bletarë të regjistruar', value: stats.users, sub: `+${stats.new_users_30d} në 30 ditët e fundit` },
+    { label: 'Me kopshte', value: stats.users_with_apiaries, sub: `${stats.active_users} llogari aktive` },
+    { label: 'Kopshte', value: stats.apiaries },
+    { label: 'Koshere', value: stats.hives, sub: stats.queenless ? `${stats.queenless} pa mbretëreshë` : null },
+    { label: 'Vizita', value: stats.visits, sub: `${stats.visits_30d} në 30 ditët e fundit` },
+    { label: 'Plane ushqimi', value: stats.feeding_plans },
+  ]
+
+  const totalHives = Math.max(1, HIVE_STATUS.reduce((s, h) => s + (stats.hive_status?.[h.key] || 0), 0))
+  const maxReg = Math.max(1, ...stats.registrations_by_month.map(r => r.c))
+  const maxLoc = Math.max(1, ...stats.by_location.map(r => r.hives))
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.1rem' }}>📰 Menaxhim Lajmesh</h2>
-        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(true); setEditItem(null); setForm({ title: '', excerpt: '', category: 'Lajme' }) }}>
-          + Lajm i Ri
-        </button>
+      <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>Statistikat</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
+        {cards.map(c => (
+          <div key={c.label} className="card card-body" style={{ padding: '1rem' }}>
+            <div style={{ fontSize: '1.9rem', fontWeight: 900, color: 'var(--gold-dark)', lineHeight: 1 }}>{c.value}</div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '0.35rem' }}>{c.label}</div>
+            {c.sub && <div style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: '0.15rem' }}>{c.sub}</div>}
+          </div>
+        ))}
       </div>
 
-      {showForm && (
-        <div className="card card-body" style={{ marginBottom: '1rem', background: 'var(--surface)' }}>
-          <h3 style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>{editItem ? 'Edito Lajm' : 'Lajm i Ri'}</h3>
-          <div className="form-group">
-            <label className="form-label">Titulli</label>
-            <input type="text" className="form-control" value={form.title}
-              onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">Kategoria</label>
-              <select className="form-control" value={form.category}
-                onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
-                {['Lajme', 'Këshilla', 'Shëndet', 'Treg', 'Evente'].map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Përmbledhje</label>
-            <textarea className="form-control" rows={2} value={form.excerpt || ''}
-              onChange={e => setForm(p => ({ ...p, excerpt: e.target.value }))} />
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowForm(false)}>Anulo</button>
-            <button className="btn btn-primary btn-sm" onClick={handleSave}>💾 Ruaj</button>
-          </div>
+      <Section title="Gjendja e koshereve">
+        <div style={{ display: 'flex', height: '14px', borderRadius: '7px', overflow: 'hidden', background: 'var(--surface)' }}>
+          {HIVE_STATUS.map(h => (
+            <div key={h.key} title={h.label} style={{ width: `${(stats.hive_status?.[h.key] || 0) / totalHives * 100}%`, background: h.color }} />
+          ))}
         </div>
-      )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem', marginTop: '0.6rem', fontSize: '0.82rem' }}>
+          {HIVE_STATUS.map(h => (
+            <span key={h.key} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: h.color }} />
+              {h.label}: <strong>{stats.hive_status?.[h.key] || 0}</strong>
+            </span>
+          ))}
+        </div>
+      </Section>
 
-      <div className="table-responsive">
-        <table className="table">
-          <thead>
-            <tr><th>Titulli</th><th>Kategoria</th><th>Data</th><th>Statusi</th><th>Veprime</th></tr>
-          </thead>
-          <tbody>
-            {news.map(n => (
-              <tr key={n.id}>
-                <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{n.title}</td>
-                <td><span className="badge badge-gold">{n.category}</span></td>
-                <td style={{ color: 'var(--muted)', fontSize: '0.82rem' }}>{n.date ? new Date(n.date).toLocaleDateString('sq-AL') : '—'}</td>
-                <td>
-                  <span className={`badge ${n.published ? 'badge-green' : 'badge-gray'}`}>
-                    {n.published ? '✅ Publikuar' : '📝 Draft'}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { setEditItem(n); setForm(n); setShowForm(true) }}>✏️</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(n.id)}>🗑</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Section title="Regjistrimet sipas muajve">
+        {stats.registrations_by_month.length === 0 ? (
+          <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Asnjë regjistrim në 12 muajt e fundit.</p>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: '120px', overflowX: 'auto' }}>
+            {stats.registrations_by_month.map(r => {
+              const [y, m] = r.month.split('-')
+              return (
+                <div key={r.month} style={{ flex: '1 0 34px', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{r.c}</span>
+                  <div style={{ width: '100%', maxWidth: '36px', height: `${r.c / maxReg * 80}%`, minHeight: '4px', background: 'var(--gold)', borderRadius: '4px 4px 0 0' }} />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '0.25rem' }}>{MONTHS[+m - 1]} {y.slice(2)}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Kosheret sipas vendndodhjes">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+          {stats.by_location.map(r => (
+            <div key={r.location} style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 38%) 1fr auto', alignItems: 'center', gap: '0.6rem', fontSize: '0.84rem' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.location}</span>
+              <div style={{ height: '10px', background: 'var(--surface)', borderRadius: '5px', overflow: 'hidden' }}>
+                <div style={{ width: `${r.hives / maxLoc * 100}%`, height: '100%', background: 'var(--green)' }} />
+              </div>
+              <span style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}><strong style={{ color: 'var(--text)' }}>{r.hives}</strong> · {r.apiaries} {r.apiaries === 1 ? 'kopsht' : 'kopshte'}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
     </div>
   )
 }
 
 function UsersTab() {
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [users, setUsers] = useState(null)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(null)
 
   useEffect(() => {
     adminDataAPI.users()
       .then(res => setUsers(res.data.users || []))
-      .catch(() => setUsers([
-        { id: 1, name: 'Agim Berisha', email: 'agim@test.com', experience: 'ekspert', location: 'Shkodër', active: true, apiaries: 3, created_at: '2026-01-15' },
-        { id: 2, name: 'Flutura Krasniqi', email: 'flutura@test.com', experience: 'mesem', location: 'Prishtinë', active: true, apiaries: 1, created_at: '2026-02-20' },
-        { id: 3, name: 'Test User', email: 'test@test.com', experience: 'fillestar', location: 'Tiranë', active: false, apiaries: 0, created_at: '2026-03-10' },
-      ]))
-      .finally(() => setLoading(false))
+      .catch(() => setError('Regjistrimet nuk u ngarkuan.'))
   }, [])
 
-  const toggleUser = async (id) => {
-    try {
-      await adminDataAPI.toggleUser(id)
-    } catch {}
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, active: !u.active } : u))
-  }
+  if (error) return <div className="alert alert-error">⚠️ {error}</div>
+  if (!users) return <PageLoader />
 
-  const filtered = users.filter(u =>
-    !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
-  )
+  const q = search.trim().toLowerCase()
+  const filtered = users.filter(u => !q
+    || `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
+    || u.email.toLowerCase().includes(q)
+    || u.apiaries.some(a => (a.location || '').toLowerCase().includes(q)))
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <h2 style={{ fontSize: '1.1rem' }}>👥 Menaxhim Përdoruesish</h2>
-        <input type="text" className="form-control" placeholder="🔍 Kërko..." value={search}
-          onChange={e => setSearch(e.target.value)} style={{ maxWidth: '240px' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <h2 style={{ fontSize: '1.1rem' }}>Regjistrimet <span style={{ color: 'var(--muted)', fontWeight: 500 }}>({users.length})</span></h2>
+        <input type="search" className="form-control" placeholder="Kërko emër, email ose vend..." value={search}
+          onChange={e => setSearch(e.target.value)} style={{ maxWidth: '260px' }} />
       </div>
 
-      <div className="table-responsive">
-        <table className="table">
-          <thead>
-            <tr><th>Emri</th><th>Email</th><th>Eksperienca</th><th>Vendndodhja</th><th>Kopshte</th><th>Statusi</th><th>Veprime</th></tr>
-          </thead>
-          <tbody>
-            {filtered.map(u => (
-              <tr key={u.id}>
-                <td style={{ fontWeight: 600 }}>{u.name}</td>
-                <td style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{u.email}</td>
-                <td style={{ fontSize: '0.82rem' }}>{u.experience || '—'}</td>
-                <td style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{u.location || '—'}</td>
-                <td style={{ textAlign: 'center' }}>{u.apiaries || 0}</td>
-                <td>
-                  <span className={`badge ${u.active ? 'badge-green' : 'badge-red'}`}>
-                    {u.active ? '✅ Aktiv' : '🚫 Joaktiv'}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {filtered.map(u => {
+          const isOpen = open === u.id
+          return (
+            <div key={u.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+              <button type="button" onClick={() => setOpen(isOpen ? null : u.id)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0.9rem',
+                background: 'var(--card)', border: 'none', cursor: 'pointer', textAlign: 'left',
+                fontFamily: 'var(--font)', color: 'var(--text)',
+              }}>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontWeight: 700, fontSize: '0.92rem' }}>
+                    {u.first_name} {u.last_name}
+                    {!u.active && <span className="badge badge-red" style={{ marginLeft: '0.5rem' }}>Joaktiv</span>}
                   </span>
-                </td>
-                <td>
-                  <button
-                    className={`btn btn-sm ${u.active ? 'btn-danger' : 'btn-green'}`}
-                    onClick={() => toggleUser(u.id)}
-                    style={{ fontSize: '0.75rem' }}
-                  >
-                    {u.active ? '🚫 Çaktivizo' : '✅ Aktivizo'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function MarketplaceAdminTab() {
-  const [listings, setListings] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    adminDataAPI.marketplaceList()
-      .then(res => setListings(res.data.listings || []))
-      .catch(() => setListings([
-        { id: 1, title: 'Mjaltë Luleshtrydhe', price: 8.5, category: 'mjaltë', seller: 'Agim B.', active: true, expires: '2026-05-17' },
-        { id: 2, title: 'Koshère Langstroth', price: 45, category: 'koshere', seller: 'Blerim K.', active: true, expires: '2026-05-15' },
-      ]))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const toggleListing = async (id) => {
-    try { await adminDataAPI.toggleListing(id) } catch {}
-    setListings(prev => prev.map(l => l.id === id ? { ...l, active: !l.active } : l))
-  }
-
-  const deleteListing = async (id) => {
-    if (!window.confirm('Fshi listimin?')) return
-    try { await adminDataAPI.deleteListing(id) } catch {}
-    setListings(prev => prev.filter(l => l.id !== id))
-  }
-
-  return (
-    <div>
-      <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>🛒 Menaxhim Marketplace</h2>
-      <div className="table-responsive">
-        <table className="table">
-          <thead>
-            <tr><th>Produkti</th><th>Çmimi</th><th>Kategoria</th><th>Shitësi</th><th>Skadon</th><th>Statusi</th><th>Veprime</th></tr>
-          </thead>
-          <tbody>
-            {listings.map(l => (
-              <tr key={l.id}>
-                <td style={{ fontWeight: 600 }}>{l.title}</td>
-                <td style={{ color: 'var(--gold-dark)', fontWeight: 700 }}>€{l.price}</td>
-                <td><span className="badge badge-gold">{l.category}</span></td>
-                <td style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{l.seller}</td>
-                <td style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{l.expires ? new Date(l.expires).toLocaleDateString('sq-AL') : '—'}</td>
-                <td>
-                  <span className={`badge ${l.active ? 'badge-green' : 'badge-gray'}`}>
-                    {l.active ? '✅ Aktiv' : '❌ Joaktiv'}
+                  <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {u.email} · regjistruar {fmtDate(u.created_at)}
                   </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button className={`btn btn-sm ${l.active ? 'btn-ghost' : 'btn-green'}`} onClick={() => toggleListing(l.id)} style={{ fontSize: '0.72rem' }}>
-                      {l.active ? 'Çaktivizo' : 'Aktivizo'}
-                    </button>
-                    <button className="btn btn-danger btn-sm" onClick={() => deleteListing(l.id)}>🗑</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </span>
+                <span style={{ textAlign: 'right', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                  <strong>{u.apiary_count}</strong> {u.apiary_count === 1 ? 'kopsht' : 'kopshte'}<br />
+                  <span style={{ color: 'var(--muted)' }}>{u.hive_count} koshere</span>
+                </span>
+                <span style={{ color: 'var(--muted)', fontSize: '0.7rem' }}>{isOpen ? '▲' : '▼'}</span>
+              </button>
+              {isOpen && (
+                <div style={{ padding: '0.25rem 0.9rem 0.9rem', background: 'var(--surface)', fontSize: '0.84rem' }}>
+                  <p style={{ color: 'var(--muted)', margin: '0.5rem 0' }}>
+                    Vizita e fundit: {fmtDate(u.last_visit)} · Postime: {u.post_count}
+                  </p>
+                  {u.apiaries.length === 0 ? (
+                    <p style={{ color: 'var(--muted)', margin: 0 }}>Nuk ka krijuar ende kopshte.</p>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table">
+                        <thead><tr><th>Kopshti</th><th>Vendndodhja</th><th>Koshere</th><th>Krijuar</th></tr></thead>
+                        <tbody>
+                          {u.apiaries.map(a => (
+                            <tr key={a.id}>
+                              <td style={{ fontWeight: 600 }}>{a.name}</td>
+                              <td style={{ color: 'var(--muted)' }}>{a.location || '—'}</td>
+                              <td>{a.hives}</td>
+                              <td style={{ color: 'var(--muted)' }}>{fmtDate(a.created_at)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {filtered.length === 0 && <p style={{ color: 'var(--muted)' }}>Asnjë rezultat.</p>}
       </div>
     </div>
   )
@@ -354,11 +273,14 @@ function MarketplaceAdminTab() {
 
 // --- Main AdminPage ---
 export default function AdminPage() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   const [admin, setAdmin] = useState(() => {
     const token = localStorage.getItem('bletaria_admin_token')
     if (token) {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+        if (payload.exp && payload.exp * 1000 < Date.now()) return null
         return { username: payload.username || 'Admin' }
       } catch { return null }
     }
@@ -368,48 +290,43 @@ export default function AdminPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('bletaria_admin_token')
+    logout()
     setAdmin(null)
+    navigate('/')
   }
 
   if (!admin) return <AdminLogin onLogin={setAdmin} />
 
   const TABS = [
-    { id: 'stats', label: '📊 Statistika' },
-    { id: 'news', label: '📰 Lajmet' },
-    { id: 'users', label: '👥 Perdoruesit' },
-    { id: 'marketplace', label: '🛒 Marketplace' },
+    { id: 'stats', label: 'Statistikat' },
+    { id: 'users', label: 'Regjistrimet' },
   ]
 
   return (
     <div className="page-content">
       <div className="container">
-        {/* Admin Header */}
         <div style={{
           background: 'linear-gradient(135deg, #1a0f00, #3d2206)',
           borderRadius: 'var(--radius)',
-          padding: '1.25rem 1.5rem',
-          marginBottom: '1.5rem',
+          padding: '1.1rem 1.25rem',
+          marginBottom: '1.25rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '1rem',
+          gap: '0.75rem',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.75rem' }}>⚙️</span>
-            <div>
-              <h1 style={{ fontSize: '1.2rem', color: 'white', marginBottom: '0.1rem' }}>Admin Panel</h1>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.82rem', margin: 0 }}>
-                Hyrë si: {admin.username}
-              </p>
-            </div>
+          <div>
+            <h1 style={{ fontSize: '1.15rem', color: 'white', marginBottom: '0.1rem' }}>Paneli i Adminit</h1>
+            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.8rem', margin: 0 }}>
+              {admin.username} · vetëm shikim i statistikave dhe regjistrimeve
+            </p>
           </div>
           <button onClick={handleLogout} className="btn btn-ghost btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
-            🚪 Dil
+            Dil
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="tabs">
           {TABS.map(t => (
             <button key={t.id} className={`tab ${activeTab === t.id ? 'active' : ''}`}
@@ -417,12 +334,9 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* Content */}
         <div className="card card-body">
           {activeTab === 'stats' && <StatsTab />}
-          {activeTab === 'news' && <NewsTab />}
           {activeTab === 'users' && <UsersTab />}
-          {activeTab === 'marketplace' && <MarketplaceAdminTab />}
         </div>
       </div>
     </div>

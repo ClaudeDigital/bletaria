@@ -1,9 +1,68 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import api from '../api'
+
+function DemoAccounts({ onPick, busyId }) {
+  const [accounts, setAccounts] = useState(null)
+
+  useEffect(() => {
+    api.get('/demo/accounts')
+      .then(res => setAccounts(res.data.accounts || []))
+      .catch(() => setAccounts([]))
+  }, [])
+
+  if (!accounts || accounts.length === 0) return null
+
+  return (
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <div style={{ padding: '1.25rem 1.25rem 0.5rem' }}>
+        <h2 style={{ fontSize: '1.05rem', marginBottom: '0.2rem' }}>Hyr me një prekje</h2>
+        <p style={{ color: 'var(--muted)', fontSize: '0.82rem', margin: 0 }}>
+          Llogari demo — zgjidh kë do të provosh, pa fjalëkalim.
+        </p>
+      </div>
+      <div style={{ padding: '0.5rem 0.75rem 0.9rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        {accounts.map(a => {
+          const admin = a.role === 'admin'
+          const name = `${a.first_name} ${a.last_name}`.trim()
+          return (
+            <button key={a.id} type="button" onClick={() => onPick(a)} disabled={!!busyId}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%',
+                padding: '0.7rem 0.75rem', textAlign: 'left', cursor: busyId ? 'wait' : 'pointer',
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font)', color: 'var(--text)',
+                opacity: busyId && busyId !== a.id ? 0.55 : 1, minHeight: '56px',
+              }}>
+              <span style={{
+                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                background: admin ? 'var(--wood, #8B5E3C)' : 'var(--gold)', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800,
+              }}>{admin ? 'A' : name.charAt(0)}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 700, fontSize: '0.92rem' }}>
+                  {admin ? 'Administratori' : name}
+                </span>
+                <span style={{ display: 'block', fontSize: '0.76rem', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {admin
+                    ? 'Statistika dhe regjistrimet'
+                    : `${a.apiary_count} ${a.apiary_count === 1 ? 'kopsht' : 'kopshte'} · ${a.hive_count} koshere${a.locations ? ' · ' + a.locations : ''}`}
+                </span>
+              </span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--gold-dark, #c4841a)', flexShrink: 0 }}>
+                {busyId === a.id ? '…' : 'Hyr →'}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, demoLogin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from?.pathname || '/dashboard'
@@ -12,6 +71,20 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
+  const [demoBusy, setDemoBusy] = useState(null)
+
+  const goHome = (u) => navigate(u?.role === 'admin' ? '/admin' : from, { replace: true })
+
+  const handleDemo = async (account) => {
+    setError('')
+    setDemoBusy(account.id)
+    try {
+      goHome(await demoLogin(account.id))
+    } catch {
+      setError('Hyrja demo dështoi. Provo sërish.')
+      setDemoBusy(null)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,10 +95,9 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(form.email, form.password)
-      navigate(from, { replace: true })
+      goHome(await login(form.email, form.password))
     } catch (err) {
-      setError(err.response?.data?.message || 'Email ose fjalëkalim i gabuar.')
+      setError(err.response?.data?.error || err.response?.data?.message || 'Email ose fjalëkalim i gabuar.')
     } finally {
       setLoading(false)
     }
@@ -41,6 +113,7 @@ export default function LoginPage() {
       background: 'var(--surface)',
     }}>
       <div style={{ width: '100%', maxWidth: '420px' }}>
+        <DemoAccounts onPick={handleDemo} busyId={demoBusy} />
         {/* Card */}
         <div className="card">
           <div style={{
@@ -67,7 +140,7 @@ export default function LoginPage() {
                 placeholder="email@shembull.com"
                 value={form.email}
                 onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                autoFocus
+                
               />
             </div>
 
@@ -132,19 +205,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Demo hint */}
-        <div style={{
-          marginTop: '1rem',
-          padding: '0.75rem 1rem',
-          background: 'rgba(245,166,35,0.1)',
-          border: '1px solid rgba(245,166,35,0.2)',
-          borderRadius: 'var(--radius-sm)',
-          fontSize: '0.8rem',
-          color: 'var(--muted)',
-          textAlign: 'center',
-        }}>
-          💡 Demo: admin@bletaria.com / admin123
-        </div>
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bletaria-v1';
+const CACHE_NAME = 'bletaria-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json'

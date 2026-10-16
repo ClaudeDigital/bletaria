@@ -20,8 +20,8 @@ const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'admin-bletaria-2025';
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY || '';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8739133614:AAErhgGg-lAeZ6SuMJfJFQplI10zq-7uwhI';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '1613742845';
-const DATA_DIR = '/opt/bletaria/data';
-const UPLOADS_DIR = '/opt/bletaria/uploads';
+const DATA_DIR = process.env.DATA_DIR || '/opt/bletaria/data';
+const UPLOADS_DIR = process.env.UPLOADS_DIR || '/opt/bletaria/uploads';
 const DB_PATH = path.join(DATA_DIR, 'bletaria.db');
 const AI_DAILY_LIMIT = 5;
 
@@ -318,6 +318,20 @@ function runMigrations() {
 }
 runMigrations();
 
+// Kopshtet: vendndodhja + shënime (forma i dërgonte, por s'ruheshin)
+{
+  const aCols = db.prepare("PRAGMA table_info(apiaries)").all().map(c => c.name);
+  if (!aCols.includes('location')) db.prepare("ALTER TABLE apiaries ADD COLUMN location TEXT").run();
+  if (!aCols.includes('notes')) db.prepare("ALTER TABLE apiaries ADD COLUMN notes TEXT").run();
+}
+
+// Llogaria e adminit në app: vetëm statistika/regjistrime, pa kopshte
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@bletaria.com').toLowerCase();
+db.prepare("UPDATE users SET role = 'admin' WHERE email = ?").run(ADMIN_EMAIL);
+
+const DEMO_MODE = (process.env.DEMO_MODE || 'true') === 'true';
+const DEMO_EMAIL_DOMAIN = process.env.DEMO_EMAIL_DOMAIN || 'demo.bletaria.app';
+
 // ─── Express App ──────────────────────────────────────────────────────────────
 
 const app = express();
@@ -364,10 +378,29 @@ function authMiddleware(req, res, next) {
       return res.status(401).json({ error: 'Llogaria është joaktive ose nuk ekziston' });
     }
     req.user = user;
+    if (user.role === 'admin' && ADMIN_BLOCKED_PATHS.test(req.originalUrl)) {
+      return res.status(403).json({ error: 'Admini nuk menaxhon kopshte — vetëm statistika dhe regjistrime.' });
+    }
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Token i pavlefshëm' });
   }
+}
+
+const ADMIN_BLOCKED_PATHS = /^\/api\/(apiaries|hives|visits|feeding|floors)(\/|\?|$)/;
+
+function signAdminTokenForUser(user) {
+  return jwt.sign(
+    { user_id: user.id, username: `${user.first_name} ${user.last_name}`.trim(), role: 'admin' },
+    ADMIN_JWT_SECRET, { expiresIn: '8h' }
+  );
+}
+
+function loginResponse(user) {
+  const { password_hash, reset_token, reset_token_expires, ...safeUser } = user;
+  const out = { token: jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' }), user: safeUser };
+  if (user.role === 'admin') out.admin_token = signAdminTokenForUser(user);
+  return out;
 }
 
 function adminMiddleware(req, res, next) {
@@ -378,7 +411,13 @@ function adminMiddleware(req, res, next) {
   const token = header.slice(7);
   try {
     const payload = jwt.verify(token, ADMIN_JWT_SECRET);
-    const admin = db.prepare('SELECT id, username FROM admin_users WHERE id = ?').get(payload.id);
+    let admin;
+    if (payload.user_id) {
+      const u = db.prepare("SELECT id, first_name, last_name FROM users WHERE id = ? AND role = 'admin' AND active = 1").get(payload.user_id);
+      if (u) admin = { id: u.id, username: `${u.first_name} ${u.last_name}`.trim() };
+    } else {
+      admin = db.prepare('SELECT id, username FROM admin_users WHERE id = ?').get(payload.id);
+    }
     if (!admin) {
       return res.status(401).json({ error: 'Admin nuk gjendet' });
     }
@@ -461,9 +500,7 @@ app.post('/api/auth/login', (req, res) => {
   if (!valid) {
     return res.status(401).json({ error: 'Email ose fjalëkalim i gabuar' });
   }
-  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
-  const { password_hash, reset_token, reset_token_expires, ...safeUser } = user;
-  res.json({ token, user: safeUser });
+  res.json(loginResponse(user));
 });
 
 // POST /api/auth/forgot-password
@@ -540,7 +577,7 @@ app.get('/api/apiaries', authMiddleware, (req, res) => {
 
 // POST /api/apiaries
 app.post('/api/apiaries', authMiddleware, (req, res) => {
-  const { name, rows, hives_per_row, row_config } = req.body;
+  const { name, rows, hives_per_row, row_config, location, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Emri i kopshtit është i detyrueshëm' });
 
   let rowCounts;
@@ -556,8 +593,9 @@ app.post('/api/apiaries', authMiddleware, (req, res) => {
 
   const createApiary = db.transaction(() => {
     const result = db.prepare(
-      'INSERT INTO apiaries (user_id, name, rows, hives_per_row) VALUES (?, ?, ?, ?)'
-    ).run(req.user.id, name.trim(), rowCounts.length, Math.max(...rowCounts));
+      'INSERT INTO apiaries (user_id, name, rows, hives_per_row, location, notes) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(req.user.id, name.trim(), rowCounts.length, Math.max(...rowCounts),
+      (location || '').trim() || null, (notes || '').trim() || null);
     const apiaryId = result.lastInsertRowid;
 
     const insertHive = db.prepare(
@@ -608,10 +646,11 @@ app.put('/api/apiaries/:id', authMiddleware, (req, res) => {
   const apiary = getOwnedApiary(req.params.id, req.user.id);
   if (!apiary) return res.status(404).json({ error: 'Bletaria nuk gjendet' });
 
-  const { name } = req.body;
+  const { name, location, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Emri është i detyrueshëm' });
 
-  db.prepare('UPDATE apiaries SET name = ? WHERE id = ?').run(name.trim(), apiary.id);
+  db.prepare('UPDATE apiaries SET name = ?, location = COALESCE(?, location), notes = COALESCE(?, notes) WHERE id = ?')
+    .run(name.trim(), location !== undefined ? (location.trim() || null) : null, notes !== undefined ? (notes.trim() || null) : null, apiary.id);
   res.json(db.prepare('SELECT * FROM apiaries WHERE id = ?').get(apiary.id));
 });
 
@@ -1506,34 +1545,85 @@ app.post('/api/admin/login', (req, res) => {
   res.json({ token, admin: { id: admin.id, username: admin.username } });
 });
 
-// GET /api/admin/stats
+// GET /api/admin/stats — vetëm lexim, për adminin
 app.get('/api/admin/stats', adminMiddleware, (req, res) => {
-  const stats = {
-    total_users: db.prepare('SELECT COUNT(*) as c FROM users').get().c,
-    active_users: db.prepare('SELECT COUNT(*) as c FROM users WHERE active = 1').get().c,
-    total_posts: db.prepare('SELECT COUNT(*) as c FROM community_posts').get().c,
-    total_apiaries: db.prepare('SELECT COUNT(*) as c FROM apiaries').get().c,
-    total_hives: db.prepare('SELECT COUNT(*) as c FROM hives').get().c,
-    total_listings: db.prepare('SELECT COUNT(*) as c FROM marketplace_listings').get().c,
-    total_news: db.prepare('SELECT COUNT(*) as c FROM news').get().c,
-    total_visits: db.prepare('SELECT COUNT(*) as c FROM visits').get().c
-  };
-  res.json(stats);
+  const c = (sql, ...a) => db.prepare(sql).get(...a).c;
+  const beekeepers = "role != 'admin'";
+  const hiveStatus = { good: 0, problem: 0, dead: 0, empty: 0 };
+  db.prepare('SELECT status, COUNT(*) c FROM hives GROUP BY status').all()
+    .forEach(r => { hiveStatus[r.status] = r.c; });
+
+  res.json({
+    users: c(`SELECT COUNT(*) c FROM users WHERE ${beekeepers}`),
+    active_users: c(`SELECT COUNT(*) c FROM users WHERE ${beekeepers} AND active = 1`),
+    users_with_apiaries: c('SELECT COUNT(DISTINCT user_id) c FROM apiaries'),
+    new_users_30d: c(`SELECT COUNT(*) c FROM users WHERE ${beekeepers} AND created_at >= datetime('now','-30 days')`),
+    apiaries: c('SELECT COUNT(*) c FROM apiaries'),
+    hives: c('SELECT COUNT(*) c FROM hives'),
+    hive_status: hiveStatus,
+    queenless: c("SELECT COUNT(*) c FROM hives WHERE status IN ('good','problem') AND COALESCE(queen_present,1) = 0"),
+    visits: c("SELECT COUNT(*) c FROM visits WHERE status = 'completed'"),
+    visits_30d: c("SELECT COUNT(*) c FROM visits WHERE status = 'completed' AND visit_date >= date('now','-30 days')"),
+    feeding_plans: c('SELECT COUNT(*) c FROM feeding_plans'),
+    posts: c('SELECT COUNT(*) c FROM community_posts'),
+    listings: c('SELECT COUNT(*) c FROM marketplace_listings'),
+    registrations_by_month: db.prepare(`
+      SELECT strftime('%Y-%m', created_at) month, COUNT(*) c FROM users
+      WHERE ${beekeepers} AND created_at >= date('now','start of month','-11 months')
+      GROUP BY month ORDER BY month`).all(),
+    by_location: db.prepare(`
+      SELECT COALESCE(NULLIF(TRIM(a.location),''), 'Pa vendndodhje') location,
+        COUNT(DISTINCT a.id) apiaries, COUNT(h.id) hives
+      FROM apiaries a LEFT JOIN hives h ON h.apiary_id = a.id
+      GROUP BY 1 ORDER BY hives DESC`).all(),
+  });
 });
 
-// GET /api/admin/users
+// GET /api/admin/users — regjistrimet (bletarët), me përmbledhje kopshtesh
 app.get('/api/admin/users', adminMiddleware, (req, res) => {
   const users = db.prepare(`
     SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.active, u.created_at,
-      COUNT(DISTINCT a.id) as apiary_count,
-      COUNT(DISTINCT p.id) as post_count
+      (SELECT COUNT(*) FROM apiaries a WHERE a.user_id = u.id) apiary_count,
+      (SELECT COUNT(*) FROM hives h JOIN apiaries a ON a.id = h.apiary_id WHERE a.user_id = u.id) hive_count,
+      (SELECT MAX(v.visit_date) FROM visits v JOIN apiaries a ON a.id = v.apiary_id WHERE a.user_id = u.id AND v.status = 'completed') last_visit,
+      (SELECT COUNT(*) FROM community_posts p WHERE p.user_id = u.id) post_count
     FROM users u
-    LEFT JOIN apiaries a ON a.user_id = u.id
-    LEFT JOIN community_posts p ON p.user_id = u.id
-    GROUP BY u.id
-    ORDER BY u.created_at DESC
+    WHERE u.role != 'admin'
+    ORDER BY u.created_at DESC, u.id DESC
   `).all();
-  res.json(users);
+  const apiariesStmt = db.prepare(`
+    SELECT a.id, a.name, a.location, a.created_at, COUNT(h.id) hives
+    FROM apiaries a LEFT JOIN hives h ON h.apiary_id = a.id
+    WHERE a.user_id = ? GROUP BY a.id ORDER BY a.created_at`);
+  res.json({ users: users.map(u => ({ ...u, apiaries: apiariesStmt.all(u.id) })) });
+});
+
+// ─── DEMO: hyrje me 1 prekje ─────────────────────────────────────────────────
+
+function demoAccountsQuery() {
+  return db.prepare(`
+    SELECT u.id, u.first_name, u.last_name, u.email, u.role,
+      (SELECT COUNT(*) FROM apiaries a WHERE a.user_id = u.id) apiary_count,
+      (SELECT COUNT(*) FROM hives h JOIN apiaries a ON a.id = h.apiary_id WHERE a.user_id = u.id) hive_count,
+      (SELECT GROUP_CONCAT(loc, ' · ') FROM (SELECT DISTINCT a.location loc FROM apiaries a WHERE a.user_id = u.id AND a.location IS NOT NULL)) locations
+    FROM users u
+    WHERE u.active = 1 AND (u.email LIKE ? OR (u.role = 'admin' AND u.email = ?))
+    ORDER BY CASE u.role WHEN 'admin' THEN 0 ELSE 1 END, apiary_count, u.id
+  `).all(`%@${DEMO_EMAIL_DOMAIN}`, ADMIN_EMAIL);
+}
+
+app.get('/api/demo/accounts', (req, res) => {
+  if (!DEMO_MODE) return res.status(404).json({ error: 'Nuk gjendet' });
+  res.json({ accounts: demoAccountsQuery() });
+});
+
+app.post('/api/demo/login', (req, res) => {
+  if (!DEMO_MODE) return res.status(404).json({ error: 'Nuk gjendet' });
+  const id = parseInt(req.body?.userId);
+  if (!demoAccountsQuery().some(a => a.id === id)) {
+    return res.status(403).json({ error: 'Kjo llogari nuk është demo' });
+  }
+  res.json(loginResponse(db.prepare('SELECT * FROM users WHERE id = ?').get(id)));
 });
 
 // PATCH /api/admin/users/:id/toggle

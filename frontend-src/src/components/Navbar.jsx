@@ -160,7 +160,7 @@ function NotificationBell({ userId }) {
 }
 
 export default function Navbar() {
-  const { user, logout, isAuthenticated } = useAuth()
+  const { user, logout, isAuthenticated, isAdmin } = useAuth()
   const { toggleTheme, isDark } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -181,7 +181,11 @@ export default function Navbar() {
     { to: '/marketplace', label: 'Tregu' },
   ]
 
-  const privateLinks = [
+  const privateLinks = isAdmin ? [
+    { to: '/admin', label: 'Paneli' },
+    { to: '/community', label: 'Komuniteti' },
+    { to: '/marketplace', label: 'Tregu' },
+  ] : [
     { to: '/dashboard', label: 'Kopshtet' },
     { to: '/community', label: 'Komuniteti' },
     { to: '/marketplace', label: 'Tregu' },
@@ -296,7 +300,7 @@ export default function Navbar() {
                   }}>
                     {[
                       { to: '/profile', label: 'Profili Im' },
-                      { to: '/dashboard', label: 'Kopshtet e Mia' },
+                      isAdmin ? { to: '/admin', label: 'Paneli i Adminit' } : { to: '/dashboard', label: 'Kopshtet e Mia' },
                     ].map(item => (
                       <Link key={item.to} to={item.to} onClick={() => setDropdownOpen(false)} style={{
                         display: 'flex', alignItems: 'center', gap: '0.5rem',

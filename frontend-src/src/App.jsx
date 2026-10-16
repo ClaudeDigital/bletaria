@@ -22,10 +22,13 @@ import ProfilePage from './pages/ProfilePage'
 import AdminPage from './pages/AdminPage'
 import DonatePage from './pages/DonatePage'
 
-function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth()
+function ProtectedRoute({ children, beekeeper = true }) {
+  const { isAuthenticated, isAdmin, loading } = useAuth()
   if (loading) return <PageLoader />
-  return isAuthenticated ? children : <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  // Admini s'menaxhon kopshte — vetëm statistika dhe regjistrime
+  if (beekeeper && isAdmin) return <Navigate to="/admin" replace />
+  return children
 }
 
 function AppRoutes() {
@@ -63,7 +66,7 @@ function AppRoutes() {
             <ProtectedRoute><AIPage /></ProtectedRoute>
           } />
           <Route path="/profile" element={
-            <ProtectedRoute><ProfilePage /></ProtectedRoute>
+            <ProtectedRoute beekeeper={false}><ProfilePage /></ProtectedRoute>
           } />
 
           {/* Catch all */}
