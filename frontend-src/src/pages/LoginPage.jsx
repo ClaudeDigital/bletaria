@@ -6,8 +6,61 @@ import api from '../api'
 import HiveStack from '../components/HiveStack'
 import { plural } from '../lib/format'
 
-function DemoAccounts({ onPick, busyId }) {
+function AdminLogin({ onLogin }) {
+  const [username, setUsername] = useState('admin')
+  const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!username || !password) {
+      setError('Shkruaj fjalëkalimin.')
+      return
+    }
+    setError('')
+    setBusy(true)
+    try {
+      await onLogin(username, password)
+    } catch (err) {
+      setError(err.response?.status === 401 ? 'Fjalëkalimi nuk është i saktë.' : 'Hyrja nuk funksionoi. Provo përsëri.')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="auth-admin" onSubmit={submit} noValidate>
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      <div className="form-group">
+        <label className="form-label" htmlFor="admin-username">Emri i përdoruesit</label>
+        <input id="admin-username" className="form-control" autoComplete="username"
+          autoCapitalize="none" spellCheck={false}
+          value={username} onChange={e => setUsername(e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label className="form-label" htmlFor="admin-password">Fjalëkalimi</label>
+        <div style={{ position: 'relative' }}>
+          <input id="admin-password" type={showPass ? 'text' : 'password'} className="form-control"
+            autoComplete="current-password" autoFocus style={{ paddingRight: 48 }}
+            value={password} onChange={e => setPassword(e.target.value)} />
+          <button type="button" className="icon-btn" onClick={() => setShowPass(s => !s)}
+            aria-label={showPass ? 'Fshih fjalëkalimin' : 'Shfaq fjalëkalimin'}
+            style={{ position: 'absolute', right: 3, top: 3 }}>
+            {showPass ? <EyeOff size={19} /> : <Eye size={19} />}
+          </button>
+        </div>
+      </div>
+      <button type="submit" className="btn btn-primary w-full" disabled={busy}>
+        {busy ? 'Duke hyrë…' : 'Hyr si administrator'}
+      </button>
+    </form>
+  )
+}
+
+function DemoAccounts({ onPick, onAdminLogin, busyId }) {
   const [accounts, setAccounts] = useState(null)
+  const [adminOpen, setAdminOpen] = useState(false)
 
   useEffect(() => {
     api.get('/demo/accounts')
@@ -20,7 +73,7 @@ function DemoAccounts({ onPick, busyId }) {
   return (
     <section className="auth-demo" aria-labelledby="demo-title">
       <h2 id="demo-title">Provo pa fjalëkalim</h2>
-      <p>Llogari demo me të dhëna shembull. Prek njërën për të hyrë.</p>
+      <p>Llogari demo me të dhëna shembull. Prek njërën për të hyrë. Administratori hyn me fjalëkalim.</p>
       <ul>
         {accounts.map(a => {
           const admin = a.role === 'admin'
@@ -30,8 +83,10 @@ function DemoAccounts({ onPick, busyId }) {
             : `${plural(a.apiary_count, 'kopsht', 'kopshte')}, ${a.hive_count} koshere`
           return (
             <li key={a.id}>
-              <button type="button" onClick={() => onPick(a)} disabled={!!busyId}
-                aria-label={`Hyr si ${name}`} data-busy={busyId === a.id || undefined}>
+              <button type="button" onClick={() => admin ? setAdminOpen(o => !o) : onPick(a)} disabled={!!busyId}
+                aria-label={admin ? 'Hyr si administrator me fjalëkalim' : `Hyr si ${name}`}
+                aria-expanded={admin ? adminOpen : undefined}
+                data-busy={busyId === a.id || undefined}>
                 <span className="auth-demo-mark">
                   {admin
                     ? <BarChart3 size={22} />
@@ -42,8 +97,9 @@ function DemoAccounts({ onPick, busyId }) {
                   <span>{detail}</span>
                   {!admin && a.locations && <span className="auth-demo-loc">{a.locations.split(' · ').join(', ')}</span>}
                 </span>
-                <span className="auth-demo-go">{busyId === a.id ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> : <ChevronRight size={20} />}</span>
+                <span className="auth-demo-go" data-open={admin && adminOpen || undefined}>{busyId === a.id ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> : <ChevronRight size={20} />}</span>
               </button>
+              {admin && adminOpen && <AdminLogin onLogin={onAdminLogin} />}
             </li>
           )
         })}
@@ -139,7 +195,8 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <DemoAccounts onPick={handleDemo} busyId={demoBusy} />
+        <DemoAccounts onPick={handleDemo} busyId={demoBusy}
+          onAdminLogin={async (username, password) => goHome(await login(username, password))} />
       </div>
     </div>
   )
@@ -158,23 +215,26 @@ export const AUTH_CSS = `
 .auth-demo > p { font-size: .9rem; margin: 4px 4px 14px; }
 .auth-demo ul { list-style: none; }
 .auth-demo li + li { border-top: 1px solid var(--line); }
-.auth-demo button {
+.auth-demo li > button {
   width: 100%; display: flex; align-items: center; gap: 14px;
   padding: 12px 6px; min-height: 64px;
   background: none; border: none; border-radius: 10px;
   font: inherit; color: var(--ink); text-align: left; cursor: pointer;
 }
-.auth-demo button:hover:not(:disabled) { background: var(--sunken); }
-.auth-demo button:disabled:not([data-busy]) { opacity: .5; }
+.auth-demo li > button:hover:not(:disabled) { background: var(--sunken); }
+.auth-demo li > button:disabled:not([data-busy]) { opacity: .5; }
 .auth-demo-mark { width: 40px; display: flex; justify-content: center; color: var(--ink); flex-shrink: 0; }
 .auth-demo-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .auth-demo-text strong { font-weight: 720; }
 .auth-demo-text span { font-size: .85rem; color: var(--ink-2); }
 .auth-demo-text .auth-demo-loc { font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.auth-demo-go { color: var(--ink-2); display: flex; }
+.auth-demo-go { color: var(--ink-2); display: flex; transition: transform .15s; }
+.auth-demo-go[data-open] { transform: rotate(90deg); }
+.auth-admin { padding: 4px 6px 14px; }
+.auth-admin .form-group { margin-bottom: 12px; }
 
 @media (max-width: 820px) {
-  .auth-grid { grid-template-columns: 1fr; }
+  .auth-grid { grid-template-columns: minmax(0, 1fr); }
   .auth-demo { order: -1; }
 }
 `

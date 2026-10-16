@@ -501,7 +501,9 @@ app.post('/api/auth/login', (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'Email dhe fjalëkalimi janë të detyrueshëm' });
   }
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  const login = email.toLowerCase().trim();
+  // Administratori hyn me emrin e përdoruesit "admin"
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(login === 'admin' ? ADMIN_EMAIL : login);
   if (!user) {
     return res.status(401).json({ error: 'Email ose fjalëkalim i gabuar' });
   }
@@ -1639,8 +1641,12 @@ app.get('/api/demo/accounts', (req, res) => {
 app.post('/api/demo/login', (req, res) => {
   if (!DEMO_MODE) return res.status(404).json({ error: 'Nuk gjendet' });
   const id = parseInt(req.body?.userId);
-  if (!demoAccountsQuery().some(a => a.id === id)) {
+  const account = demoAccountsQuery().find(a => a.id === id);
+  if (!account) {
     return res.status(403).json({ error: 'Kjo llogari nuk është demo' });
+  }
+  if (account.role === 'admin') {
+    return res.status(403).json({ error: 'Administratori hyn me fjalëkalim' });
   }
   res.json(loginResponse(db.prepare('SELECT * FROM users WHERE id = ?').get(id)));
 });
