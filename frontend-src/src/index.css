@@ -32,6 +32,13 @@
   --paint-sky: #94B8CC;
   --paint-sage: #A9B98F;
 
+  /* Bari */
+  --grass-1: #9CC274;
+  --grass-2: #76A653;
+  --grass-3: #5A8A3E;
+  --grass-4: #42692E;
+  --soil: #6B5233;
+
   /* Emra të vjetër që përdoren nëpër faqe — tani tregojnë te paleta e re */
   --gold: var(--honey);
   --gold-light: var(--wax);
@@ -80,6 +87,11 @@
   --propolis-soft: #3A211B;
   --hive-blue: #86AED3;
   --paint-white: #CFCBBE;
+  --grass-1: #6F9A50;
+  --grass-2: #557F3B;
+  --grass-3: #436A2F;
+  --grass-4: #2F4D22;
+  --soil: #3E3020;
   --shadow: rgba(0, 0, 0, 0.4);
   --shadow-md: rgba(0, 0, 0, 0.6);
   color-scheme: dark;

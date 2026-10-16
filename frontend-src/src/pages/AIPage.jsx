@@ -256,7 +256,7 @@ export default function AIPage() {
             <Sparkles size={22} />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.15rem', marginBottom: '0.1rem' }}>Asistenti i bletarit</h1>
+            <h1 style={{ fontSize: '1.15rem', marginBottom: '0.1rem' }}>Bletari AI</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--green)' }}>
               <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
               Përgjigjet në shqip

@@ -4,6 +4,7 @@ import { Layers, Crown, CalendarClock, Droplets, Sparkles, Store } from 'lucide-
 import { newsAPI } from '../api'
 import { useAuth } from '../context/AuthContext'
 import HiveStack from '../components/HiveStack'
+import { GrassBack, GrassFront, Hills } from '../components/Meadow'
 import { fmtDate } from '../lib/format'
 
 // Një rresht kosheresh si në oborr: kate të ndryshme, bojëra të ndryshme
@@ -19,7 +20,7 @@ const FEATURES = [
   { Icon: Crown, title: 'Mbretëresha', text: 'A është aty, sa muajshe është. Kosheret pa mbretëreshë dalin të shënuara.' },
   { Icon: CalendarClock, title: 'Vizitat', text: 'Planifiko vizitën e radhës. Një ditë më parë të vjen kujtesa në Telegram.' },
   { Icon: Droplets, title: 'Ushqimi dhe trajtimi', text: 'Kush mori shurup, kush acid oksalik, sa dhe kur. Për të gjithë kopshtin ose vetëm disa koshere.' },
-  { Icon: Sparkles, title: 'Asistenti', text: 'Përshkruaj çfarë sheh në koshere dhe merr këshillë praktike, në shqip.' },
+  { Icon: Sparkles, title: 'Bletari AI', text: 'Përshkruaj çfarë sheh në koshere dhe merr këshillë praktike, në shqip, në çdo orë.' },
   { Icon: Store, title: 'Tregu dhe komuniteti', text: 'Shit mjaltë e familje bletësh, pyet bletarët e tjerë.' },
 ]
 
@@ -29,9 +30,9 @@ const STEPS = [
   { title: 'Shih kush ka nevojë', text: 'Pamja e kopshtit të tregon menjëherë kosheret e dobëta, pa mbretëreshë apo bosh.' },
 ]
 
-function Tag() {
+function TagBody() {
   return (
-    <div className="home-yard-tag home-yard-tag-desk">
+    <>
       <div className="stencil" style={{ fontSize: '1.1rem' }}>R1-4</div>
       <dl>
         <div><dt>Kate</dt><dd>4</dd></div>
@@ -39,34 +40,31 @@ function Tag() {
         <div><dt>Korniza mjalti</dt><dd>22</dd></div>
         <div><dt>Vizita e fundit</dt><dd>para 3 ditësh</dd></div>
       </dl>
-    </div>
+    </>
   )
 }
 
 function Yard() {
   const w = typeof window !== 'undefined' ? window.innerWidth : 1200
-  const hiveW = w < 560 ? 54 : w < 900 ? 72 : 88
+  const hiveW = w < 560 ? 56 : w < 900 ? 74 : 92
   return (
-    <div className="home-yard" aria-hidden="true">
-      <div className="home-yard-row">
-        {YARD.map((h, i) => (
-          <div key={i} className={`home-yard-hive${h.focus ? ' is-focus' : ''}${i > 6 ? ' wide-only' : ''}`}>
-            <HiveStack seed={h.seed} floors={h.floors} status={h.status || 'good'} queenless={h.queenless} width={hiveW} />
-            <span className="hive-label">R1-{i + 1}</span>
-            {h.focus && <Tag />}
-          </div>
-        ))}
+    <section className="home-yard" aria-label="Shembull: një rresht kosheresh në oborr">
+      <div className="home-yard-tag home-yard-tag-mobile"><TagBody /></div>
+      <div className="home-yard-scene">
+        <Hills height={w < 560 ? 70 : 130} />
+        <GrassBack height={w < 560 ? 44 : 60} />
+        <div className="home-yard-row">
+          {YARD.map((h, i) => (
+            <div key={i} className={`home-yard-hive${h.focus ? ' is-focus' : ''}${i > 6 ? ' wide-only' : ''}`}>
+              {h.focus && <div className="home-yard-tag home-yard-tag-desk"><TagBody /></div>}
+              <HiveStack seed={h.seed} floors={h.floors} status={h.status || 'good'} queenless={h.queenless} width={hiveW} />
+            </div>
+          ))}
+        </div>
+        <GrassFront height={w < 560 ? 30 : 40} />
       </div>
-      <div className="home-yard-tag home-yard-tag-mobile">
-        <div className="stencil" style={{ fontSize: '1.1rem' }}>R1-4</div>
-        <dl>
-          <div><dt>Kate</dt><dd>4</dd></div>
-          <div><dt>Mbretëresha</dt><dd>14 muaj</dd></div>
-          <div><dt>Korniza mjalti</dt><dd>22</dd></div>
-          <div><dt>Vizita e fundit</dt><dd>para 3 ditësh</dd></div>
-        </dl>
-      </div>
-    </div>
+      <div className="home-yard-soil" />
+    </section>
   )
 }
 
@@ -89,15 +87,22 @@ export default function HomePage() {
     <div className="home">
       <style>{HOME_CSS}</style>
 
-      <section className="container home-hero">
-        <h1>Ditari i bletarisë,<br />kat pas kati.</h1>
-        <p className="home-lede">
-          Shëno vizitat, mbretëreshat dhe kornizat me mjaltë për secilën koshere.
-          Në fund të sezonit e di saktë cila punoi e cila jo.
-        </p>
-        <div className="home-cta">
-          <Link to="/register" className="btn btn-primary btn-lg">Krijo llogari falas</Link>
-          <Link to="/login" className="btn btn-ghost btn-lg">Hyr</Link>
+      <section className="home-hero">
+        <picture className="home-hero-photo">
+          <source media="(max-width: 700px)" srcSet="/img/hoje-900.jpg" />
+          <img src="/img/hoje-1920.jpg" alt="Bletë mbi hoje me mjaltë" fetchpriority="high" />
+        </picture>
+        <div className="container home-hero-inner">
+          <h1>Ditari i bletarisë,<br />kat pas kati.</h1>
+          <p className="home-lede">
+            Shëno vizitat, mbretëreshat dhe kornizat me mjaltë për secilën koshere.
+            Në fund të sezonit e di saktë cila punoi e cila jo.
+          </p>
+          <div className="home-cta">
+            <Link to="/register" className="btn btn-primary btn-lg">Krijo llogari falas</Link>
+            <Link to="/login" className="btn btn-lg home-btn-light">Hyr</Link>
+          </div>
+          <p className="home-hero-ai"><Sparkles size={16} /> Me Bletari AI: pyet për varroa, mbretëreshën ose ushqimin, në shqip.</p>
         </div>
       </section>
 
@@ -164,54 +169,79 @@ export default function HomePage() {
 
 const HOME_CSS = `
 .home h2 { font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.025em; margin-bottom: 22px; }
-.home-hero { padding-top: clamp(40px, 9vw, 96px); }
+.home-hero { position: relative; min-height: min(720px, 92vh); display: flex; align-items: flex-end; overflow: hidden; background: #1b1408; isolation: isolate; }
+.home-hero-photo, .home-hero-photo img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.home-hero-photo img { object-fit: cover; object-position: 70% 40%; animation: hero-zoom 14s ease-out both; }
+@keyframes hero-zoom { from { transform: scale(1.08); } }
+.home-hero::after {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(24,18,8,.92) 0%, rgba(24,18,8,.78) 34%, rgba(24,18,8,.25) 68%, rgba(24,18,8,.05) 100%),
+    linear-gradient(0deg, rgba(24,18,8,.55) 0%, rgba(24,18,8,0) 40%);
+}
+.home-hero-inner { position: relative; z-index: 1; padding-top: 96px; padding-bottom: clamp(48px, 9vw, 104px); }
 .home-hero h1 {
-  font-size: clamp(2.6rem, 9.5vw, 5.6rem);
-  line-height: .95;
+  color: #FFF8E6;
+  font-size: clamp(2.7rem, 9.5vw, 6rem);
+  line-height: .93;
   letter-spacing: -0.045em;
   font-weight: 860;
-  max-width: 12ch;
+  max-width: 11ch;
+  text-shadow: 0 2px 30px rgba(0,0,0,.35);
 }
-.home-lede { font-size: clamp(1.05rem, 2.4vw, 1.25rem); max-width: 46ch; margin-top: 22px; color: var(--ink-2); }
-.home-cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
+.home-lede { font-size: clamp(1.05rem, 2.4vw, 1.25rem); max-width: 44ch; margin-top: 22px; color: rgba(255, 248, 230, .82); }
+.home-cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; }
+.home-btn-light { background: rgba(255,248,230,.1); color: #FFF8E6; border-color: rgba(255,248,230,.4); backdrop-filter: blur(6px); }
+.home-btn-light:hover { background: rgba(255,248,230,.2); color: #fff; border-color: rgba(255,248,230,.7); }
+.home-hero-ai { display: inline-flex; align-items: center; gap: 8px; margin-top: 26px; font-size: .92rem; color: rgba(255,248,230,.75); }
+.home-hero-ai svg { color: var(--honey); flex-shrink: 0; }
+@media (max-width: 700px) {
+  .home-hero { min-height: 640px; }
+  .home-hero-photo img { object-position: 60% 50%; }
+  .home-hero::after { background: linear-gradient(180deg, rgba(24,18,8,.35) 0%, rgba(24,18,8,.7) 45%, rgba(24,18,8,.93) 100%); }
+}
 
-.home-yard { position: relative; margin-top: clamp(36px, 7vw, 72px); }
+/* Oborri në livadh */
+.home-yard {
+  position: relative;
+  padding-top: clamp(64px, 15vw, 200px);
+  background: linear-gradient(180deg, color-mix(in srgb, #CFE0E6 55%, var(--ground)) 0%, var(--ground) 70%);
+}
+[data-theme="dark"] .home-yard { background: linear-gradient(180deg, #0f1a1d 0%, var(--ground) 75%); }
+.home-yard-scene { position: relative; }
+.meadow-layer { display: block; position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.meadow-back { z-index: 0; }
+.meadow-hills { position: absolute; left: 0; right: 0; bottom: 20px; display: block; z-index: 0; pointer-events: none; }
+.meadow-front { z-index: 2; }
 .home-yard-row {
-  display: flex; align-items: flex-end; justify-content: center; gap: clamp(10px, 3vw, 30px);
-  padding: 0 16px;
-  min-height: 190px; padding-top: 24px;
+  position: relative; z-index: 1;
+  display: flex; align-items: flex-end; justify-content: center; gap: clamp(12px, 3.2vw, 36px);
+  padding: 0 24px 16px; max-width: 1240px; margin: 0 auto;
 }
-.home-yard::after {
-  content: ""; display: block; height: 18px;
-  background: color-mix(in srgb, var(--meadow) 28%, var(--ground));
-  border-top: 2px solid color-mix(in srgb, var(--meadow) 55%, var(--ground));
-}
-.home-yard-hive { display: flex; flex-direction: column; align-items: center; position: relative; }
-.home-yard-tag-mobile { display: none; }
-.home-yard-hive .hive-label { margin: 2px 0 6px; }
-.home-yard-hive.is-focus .hive-label { color: var(--ink); }
-.home-yard-hive.is-focus .hive-svg { animation: hive-lift .7s .25s cubic-bezier(.2,.8,.2,1) both; }
-@keyframes hive-lift { from { transform: translateY(14px); opacity: 0; } }
+.home-yard-hive { position: relative; display: flex; flex-direction: column; align-items: center; }
+.home-yard-hive.is-focus .hive-svg { animation: hive-lift .7s .3s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes hive-lift { from { transform: translateY(18px); opacity: 0; } }
+.home-yard-soil { height: 22px; background: linear-gradient(180deg, var(--grass-4), color-mix(in srgb, var(--grass-4) 70%, var(--soil))); }
 .home-yard-tag {
-  position: absolute; bottom: calc(100% - 6px); left: 72%; z-index: 2; white-space: nowrap;
   background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
-  padding: 12px 14px; min-width: 190px;
-  box-shadow: 0 10px 28px var(--shadow);
-  animation: tag-in .5s .75s ease both;
+  padding: 12px 14px; min-width: 200px; white-space: nowrap;
+  box-shadow: 0 14px 34px var(--shadow);
 }
-@keyframes tag-in { from { opacity: 0; transform: translateX(-8px); } }
+.home-yard-tag-desk { position: absolute; bottom: calc(100% + 14px); left: 50%; transform: translateX(-30%); z-index: 3; animation: tag-in .5s .8s ease both; }
+.home-yard-tag-desk::after { content: ""; position: absolute; left: 30%; bottom: -7px; width: 12px; height: 12px; background: var(--paper); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: translateX(-50%) rotate(45deg); }
+@keyframes tag-in { from { opacity: 0; transform: translate(-30%, 8px); } }
+.home-yard-tag-mobile { display: none; }
 .home-yard-tag dl { margin-top: 6px; display: grid; gap: 3px; font-size: .84rem; }
 .home-yard-tag dl div { display: flex; justify-content: space-between; gap: 16px; }
 .home-yard-tag dt { color: var(--ink-2); }
 .home-yard-tag dd { font-weight: 650; }
 @media (max-width: 900px) { .wide-only { display: none !important; } }
 @media (max-width: 560px) {
-  .home-yard-row { justify-content: flex-start; padding-left: 16px; min-height: 0; padding-top: 8px; }
+  .home-yard { padding-top: 24px; }
   .home-yard-hive:nth-child(n+6) { display: none; }
+  .home-yard-row { gap: 12px; }
   .home-yard-tag-desk { display: none; }
-  .home-yard-tag-mobile { display: block; position: static; margin: 0 16px 16px; box-shadow: none; }
-  .home-yard { display: flex; flex-direction: column-reverse; overflow: hidden; }
-  .home-yard::after { order: -1; }
+  .home-yard-tag-mobile { display: block; margin: 0 16px 28px; box-shadow: none; }
 }
 
 .home-steps { padding: clamp(48px, 8vw, 88px) 16px; }

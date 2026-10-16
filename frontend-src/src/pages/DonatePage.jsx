@@ -67,7 +67,7 @@ export default function DonatePage() {
             vazhdojmë të zhvillojmë funksione të reja dhe mbajmë platformën aktive.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-            {['Hosting', 'Zhvillim', 'Aplikacioni', 'AI Asistent'].map(tag => (
+            {['Hosting', 'Zhvillim', 'Aplikacioni', 'Bletari AI'].map(tag => (
               <span key={tag} style={{
                 background: 'rgba(227,162,26,0.08)', color: 'var(--gold)',
                 padding: '0.3rem 0.8rem', borderRadius: '20px',

@@ -116,7 +116,7 @@ export default function Navbar() {
           { to: '/dashboard', label: 'Kopshtet', Icon: LayoutGrid },
           { to: '/community', label: 'Komuniteti', Icon: Users },
           { to: '/marketplace', label: 'Tregu', Icon: Store },
-          { to: '/ai', label: 'Asistenti', Icon: Sparkles },
+          { to: '/ai', label: 'Bletari AI', Icon: Sparkles },
         ]
 
   const first = user?.name?.split(' ')[0] || 'Bletari'
